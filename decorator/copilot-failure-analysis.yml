@@ -4,14 +4,17 @@
 # This step only runs when the job has failed (runtime condition).
 # Opt-out: set pipeline variable COPILOT_ANALYSIS_DISABLED=true.
 #
-# GitHub PAT resolution order:
-#   1. COPILOT_GITHUB_PAT pipeline variable (secret) — if set, used directly.
-#   2. Service connection "GitHub Copilot CLI Decorator" (Generic/ExternalServer)
-#      — PAT is read from the password field via the ADO REST API.
+# Setup:
+#   1. Create a secret pipeline variable COPILOT_GITHUB_PAT with a GitHub PAT
+#      that has an active Copilot license. You can set it at:
+#       - Pipeline level: Edit pipeline → Variables → New variable (secret)
+#       - Project level: Pipelines → Library → Variable group → link to pipelines
+#   2. Node.js must be available on the agent (for npx @github/copilot).
+#   3. Python 3 must be available on the agent (standard on hosted agents).
 #
-# Prerequisites:
-#   - Node.js must be available on the agent (for npx @github/copilot).
-#   - Python 3 must be available on the agent (standard on hosted agents).
+# Note: Service connection secrets cannot be read from CmdLine scripts in ADO.
+#       Only custom tasks (via task SDK) can access them. That's why a pipeline
+#       variable is required.
 
 steps:
   - task: CmdLine@2
@@ -44,7 +47,6 @@ steps:
         agent_os  = os.environ.get('AGENT_OS', 'unknown')
         ado_token = os.environ.get('SYSTEM_ACCESSTOKEN', '')
         gh_pat    = os.environ.get('COPILOT_GITHUB_PAT', '')
-        sc_name   = os.environ.get('COPILOT_SERVICE_CONNECTION', 'GitHub Copilot CLI Decorator')
         max_lines = int(os.environ.get('COPILOT_MAX_LOG_LINES', '150'))
         timeout_s = int(os.environ.get('COPILOT_CLI_TIMEOUT', '120'))
         temp_dir  = os.environ.get('AGENT_TEMPDIRECTORY', '/tmp')
@@ -57,7 +59,23 @@ steps:
             if secret:
                 print(f"##vso[task.setsecret]{secret}")
 
-        # ── ADO REST helper ────────────────────────────────────
+        # ── Validate prerequisites ─────────────────────────────
+        if not gh_pat or gh_pat.startswith('$('):
+            warn("COPILOT_GITHUB_PAT not set. Add it as a secret pipeline variable.")
+            print("")
+            print("   How to set up:")
+            print("   1. Go to your pipeline → Edit → Variables")
+            print("   2. Click 'New variable'")
+            print("   3. Name: COPILOT_GITHUB_PAT")
+            print("   4. Value: your GitHub PAT (with Copilot license)")
+            print("   5. Check 'Keep this value secret'")
+            print("   6. Save")
+            print("")
+            print("   Or use a Variable Group (Pipelines → Library) for org-wide setup.")
+            sys.exit(0)
+
+        mask(gh_pat)
+
         if not ado_token or ado_token.startswith('$('):
             warn("System.AccessToken not available. Skipping Copilot analysis.")
             sys.exit(0)
@@ -69,64 +87,6 @@ steps:
             })
             with urllib.request.urlopen(req, timeout=30) as resp:
                 return resp.read().decode('utf-8', errors='replace')
-
-        # ── Resolve GitHub PAT ─────────────────────────────────
-        # Priority 1: explicit pipeline variable
-        if gh_pat and not gh_pat.startswith('$('):
-            print("  Using GitHub PAT from COPILOT_GITHUB_PAT variable")
-            mask(gh_pat)
-        else:
-            # Priority 2: read from service connection via REST API
-            print(f"  Looking up service connection: {sc_name}")
-            try:
-                import urllib.parse
-                sc_url = (
-                    f"{org_url}/{urllib.parse.quote(project, safe='')}"
-                    f"/_apis/serviceendpoint/endpoints"
-                    f"?endpointNames={urllib.parse.quote(sc_name)}"
-                    f"&api-version=7.1-preview.4"
-                )
-                sc_body = json.loads(ado_get(sc_url))
-                endpoints = sc_body.get('value', [])
-                print(f"  API returned {len(endpoints)} endpoint(s)")
-                if not endpoints:
-                    warn(f"Service connection '{sc_name}' not found. "
-                         "Set COPILOT_GITHUB_PAT variable or check the connection name.")
-                    sys.exit(0)
-
-                ep = endpoints[0]
-                auth = ep.get('authorization', {})
-                params = auth.get('parameters', {})
-                scheme = auth.get('scheme', '')
-
-                # Generic (ExternalServer) can use UsernamePassword or Token scheme
-                if scheme.lower() in ('usernamepassword', 'username'):
-                    gh_pat = params.get('password', '') or params.get('apitoken', '')
-                elif scheme.lower() == 'token':
-                    gh_pat = params.get('apitoken', '') or params.get('AccessToken', '')
-                else:
-                    # Try all known parameter names
-                    gh_pat = (params.get('password', '')
-                              or params.get('apitoken', '')
-                              or params.get('AccessToken', ''))
-
-                if gh_pat:
-                    mask(gh_pat)
-                    print(f"  ✅ PAT retrieved from service connection '{sc_name}'")
-                else:
-                    warn(f"Service connection '{sc_name}' found but password/token is empty or masked. "
-                         "Set COPILOT_GITHUB_PAT as a secret pipeline variable instead.")
-                    sys.exit(0)
-
-            except urllib.error.HTTPError as e:
-                warn(f"Failed to query service connection (HTTP {e.code}). "
-                     "Check that the build identity has access. "
-                     "Alternatively, set COPILOT_GITHUB_PAT as a pipeline variable.")
-                sys.exit(0)
-            except Exception as e:
-                warn(f"Error reading service connection: {e}. "
-                     "Set COPILOT_GITHUB_PAT as a pipeline variable instead.")
-                sys.exit(0)
 
         # ── Phase 1: Collect failed step logs ──────────────────
         print("\n🤖 Copilot Failure Analysis")
@@ -301,3 +261,4 @@ steps:
         COPILOT_ANALYSIS_SCRIPT
     env:
       SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+      COPILOT_GITHUB_PAT: $(COPILOT_GITHUB_PAT)
