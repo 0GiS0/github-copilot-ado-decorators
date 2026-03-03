@@ -4,7 +4,7 @@
     "publisher": "returngisorg",
 
 
-    "version": "0.5.0",
+    "version": "0.6.0",
     "name": "GitHub Copilot Pipeline Failure Analyzer [DEV]",
     "description": "Automatically analyzes pipeline failures using AI and provides root cause analysis with fix suggestions. (Development version)",
     "categories": ["Azure Pipelines"],
@@ -46,7 +46,7 @@
                 "ms.azure-pipelines-agent-job.post-job-tasks"
             ],
             "properties": {
-                "name": "src/copilot-failure-analysis-task"
+                "name": "dist/copilot-failure-analysis-task"
             }
         }
     ],
@@ -62,7 +62,7 @@
             "contentType": "text/plain"
         },
         {
-            "path": "src/copilot-failure-analysis-task",
+            "path": "dist/copilot-failure-analysis-task",
             "addressable": true,
             "packagePath": "copilot-failure-analysis-task"
         }

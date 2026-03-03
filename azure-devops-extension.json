@@ -44,7 +44,7 @@
                 "ms.azure-pipelines-agent-job.post-job-tasks"
             ],
             "properties": {
-                "name": "src/copilot-failure-analysis-task"
+                "name": "dist/copilot-failure-analysis-task"
             }
         }
     ],
@@ -60,7 +60,7 @@
             "contentType": "text/plain"
         },
         {
-            "path": "src/copilot-failure-analysis-task",
+            "path": "dist/copilot-failure-analysis-task",
             "addressable": true,
             "packagePath": "copilot-failure-analysis-task"
         }
