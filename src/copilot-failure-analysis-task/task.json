@@ -1,19 +1,25 @@
 {
     "$schema": "https://raw.githubusercontent.com/Microsoft/azure-pipelines-task-lib/master/tasks.schema.json",
-    "id": "b9f44e6a-3c72-4f5e-8a1d-df0e2c3b4a5f",
+    "id": "1eb0639b-4621-4a25-a38d-f66f162787b6",
     "name": "CopilotFailureAnalysis",
     "friendlyName": "Copilot Failure Analysis",
     "description": "Analyzes pipeline failure logs using GitHub Copilot and provides root cause analysis with fix suggestions.",
     "category": "Utility",
     "author": "returngisorg",
     "version": {
-        "Major": 0,
-        "Minor": 1,
+        "Major": 1,
+        "Minor": 0,
         "Patch": 0
     },
+    "minimumAgentVersion": "2.144.0",
     "instanceNameFormat": "Copilot Failure Analysis",
+    "groups": [],
+    "demands": [],
     "execution": {
         "Node20_1": {
+            "target": "index.js"
+        },
+        "Node16": {
             "target": "index.js"
         }
     },
