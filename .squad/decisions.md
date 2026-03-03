@@ -75,3 +75,11 @@ Pipeline decorators can ONLY be contributed by private extensions. Cannot be pub
 ## D15: Debug context documented
 **Date:** 2026-03-03 | **Author:** Keaton | **Status:** Accepted
 `system.debugContext` variable — set to `true` to see decorator template expansion context at runtime.
+
+## D16: Add Test/Verification Decorator
+**Date:** 2026-03-03 | **Author:** McManus | **Status:** Proposed
+Added `decorator/test-decorator.yml` — second decorator contribution (`copilot-test-decorator`) for verifying extension installation. Compile-time gate via `${{ if eq(variables['COPILOT_TEST_MODE'], 'true') }}` ensures zero impact on normal pipelines. Runtime opt-out via `COPILOT_TEST_DECORATOR_DISABLED`. Uses inline `CmdLine@2` — no custom task. Updated ARCHITECTURE.md sections 4 and 5.
+
+## D17: Deployment Guide Created
+**Date:** 2026-03-03 | **Author:** Keaton | **Status:** Proposed
+Created `DEPLOYMENT.md` — 8-phase step-by-step deployment guide (Prerequisites → Build → Publish → Install → PAT Config → Test Verify → Failure Test → Updates). Includes troubleshooting section with 10 common issues. Two PATs needed: Azure DevOps (Marketplace publishing) and GitHub (Copilot CLI). Separated from ARCHITECTURE.md per separation of concerns. Updated ARCHITECTURE.md Section 11 with link.
