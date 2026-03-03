@@ -11,7 +11,7 @@
 - [Phase B: Build the Extension](#phase-b-build-the-extension)
 - [Phase C: Publish as Private Extension](#phase-c-publish-as-private-extension)
 - [Phase D: Install in Azure DevOps Organization](#phase-d-install-in-azure-devops-organization)
-- [Phase E: Configure the GitHub PAT](#phase-e-configure-the-github-pat)
+- [Phase E: Configure the GitHub PAT (Service Connection)](#phase-e-configure-the-github-pat-service-connection)
 - [Phase F: Verify with Test Decorator](#phase-f-verify-with-test-decorator)
 - [Phase G: Test the Failure Analysis](#phase-g-test-the-failure-analysis)
 - [Phase H: Updating the Extension](#phase-h-updating-the-extension)

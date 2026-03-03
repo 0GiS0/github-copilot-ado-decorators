@@ -70,3 +70,15 @@
 - **Private extension workflow:** `tfx extension publish --share-with <org>` is the single-command approach. Extension updates auto-propagate to installed orgs. Decorator injection may take up to 5 minutes to cache after installation.
 - **Separation of concerns:** Deployment instructions live in DEPLOYMENT.md, not in ARCHITECTURE.md. Different audiences, different update cadences.
 - **Test decorator (McManus, 2026-03-03):** McManus created `decorator/test-decorator.yml` — compile-time gated via `${{ if eq(variables['COPILOT_TEST_MODE'], 'true') }}`. Runtime opt-out via `COPILOT_TEST_DECORATOR_DISABLED`. Uses inline `CmdLine@2`. Separate contribution ID (`copilot-test-decorator`). Referenced in DEPLOYMENT.md Phase F for installation verification. Updated ARCHITECTURE.md sections 4 and 5.
+- **Service Connection auth (2026-03-03):** Fundamental shift from Variable Group / env var to service connection for PAT storage. Key changes:
+  - **Supersedes D2/D2-R:** Now using a Generic (ExternalServer) service connection named "GitHub Copilot CLI Decorator" instead of Variable Group `CopilotFailureAnalysis` with `COPILOT_GITHUB_PAT`
+  - Service connection type: Generic (ExternalServer) — configured in Project Settings → Service connections
+  - Task reads PAT via `tl.getEndpointAuthorizationParameter(connectedServiceName, 'password', false)` — NOT from env var
+  - Decorator YAML uses `inputs: connectedServiceName: 'GitHub Copilot CLI Decorator'` instead of `env: GITHUB_TOKEN: $(COPILOT_GITHUB_PAT)`
+  - `SYSTEM_ACCESSTOKEN` unchanged — still comes as env var from `$(System.AccessToken)`
+  - task.json must declare input `connectedServiceName` of type `connectedService:ExternalServer`
+  - "Grant access permission to all pipelines" is required on the service connection — critical for decorator use
+  - Decision file: `.squad/decisions/inbox/keaton-service-connection.md`
+  - Open question Q9: does "Grant access to all pipelines" apply to decorator-injected task inputs?
+- **Service connection pattern in ADO tasks:** `connectedService:ExternalServer` input type allows tasks to reference Generic service connections. The task SDK provides `tl.getEndpointAuthorizationParameter(endpointName, 'password', false)` to read the credential at runtime. Must call `tl.setSecret()` on the retrieved value.
+- **Key architectural insight:** Service connections are the ADO-native pattern for external credentials. "Grant access to all pipelines" solves the decorator scaling problem — no per-pipeline variable group linking needed.
