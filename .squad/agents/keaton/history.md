@@ -46,6 +46,18 @@
 - **GitHub Copilot CLI (`@github/copilot`):** Standalone agentic CLI tool. Install via npm (`npm install -g @github/copilot`), requires Node.js 22+. Non-interactive: `copilot -p "prompt"`. Silent mode: `copilot -sp "prompt"` (only response output). Auth via `GITHUB_TOKEN` env var. Requires Copilot license.
 - **npx invocation pattern:** `npx @github/copilot -sp "prompt"` — zero install, on-demand, cached after first download. Ideal for CI/CD. Avoids global install permissions and version management.
 - **ADO decorator type (CORRECTED 2026-03-03):** Contribution type is `ms.azure-pipelines.pipeline-decorator` (single type for ALL decorators). Target is `ms.azure-pipelines-agent-job.post-job-tasks` for post-job injection. Previous value `ms.azure-pipelines-agent-job.post-job-steps` was WRONG.
+- **Service Connection auth (2026-03-03):** Fundamental shift from Variable Group / env var to service connection for PAT storage. Key changes:
+  - **Reversed D2/D2-R:** Now using a Generic (ExternalServer) service connection named "GitHub Copilot CLI Decorator" instead of Variable Group `CopilotFailureAnalysis` with `COPILOT_GITHUB_PAT`
+  - Service connection type: Generic (ExternalServer) — configured in Project Settings → Service connections
+  - Task reads PAT via `tl.getEndpointAuthorizationParameter(connectedServiceName, 'password', false)` — NOT from env var
+  - Decorator YAML uses `inputs: connectedServiceName: 'GitHub Copilot CLI Decorator'` instead of `env: GITHUB_TOKEN: $(COPILOT_GITHUB_PAT)`
+  - `SYSTEM_ACCESSTOKEN` unchanged — still comes as env var from `$(System.AccessToken)`
+  - task.json must declare input `connectedServiceName` of type `connectedService:ExternalServer`
+  - "Grant access permission to all pipelines" is required on the service connection — critical for decorator use
+  - Decision file: `.squad/decisions/inbox/keaton-service-connection.md`
+  - Open question Q9: does "Grant access to all pipelines" apply to decorator-injected task inputs?
+- **Service connection pattern in ADO tasks:** `connectedService:ExternalServer` input type allows tasks to reference Generic service connections. The task SDK provides `tl.getEndpointAuthorizationParameter(endpointName, 'password', false)` to read the credential at runtime. Must call `tl.setSecret()` on the retrieved value.
+- **Key architectural insight:** Service connections are the ADO-native pattern for external credentials. "Grant access to all pipelines" solves the decorator scaling problem — no per-pipeline variable group linking needed.
 - **Decorator YAML files entry:** Must specify exact file path and `contentType: "text/plain"` — not just the folder.
 - **Private extensions only:** Pipeline decorators can only be contributed by private extensions. Cannot be on public marketplace. Must be shared privately with orgs.
 - **`condition:` vs `${{ if }}` in decorators:** `${{ if }}` is compile-time (template expansion), `condition:` is runtime. Both valid in decorator templates. Our `condition: failed()` is correct — it's a runtime check. `${{ if }}` would control whether the step is injected at all.

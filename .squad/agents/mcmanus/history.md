@@ -10,6 +10,16 @@
 - Joined the team on 2026-03-03 as DevOps / Pipeline Specialist
 - 2026-03-03: Created test/verification decorator (`decorator/test-decorator.yml`). Key takeaway: use `${{ if }}` compile-time gate for decorators that should only appear conditionally — prevents step from even being injected into pipeline definitions. Combine with `condition:` for runtime opt-out. Inline `CmdLine@2` is sufficient for simple verification — no need for a custom task.
 - 2026-03-03: Decorator contributions share the same `type` (`ms.azure-pipelines.pipeline-decorator`) and can share the same `targets` array. Multiple decorator contributions in one extension work fine — each gets its own contribution `id` and template path.
+- 2026-03-03: Issue #1 — Project structure setup (PR #23, branch `feature/1-project-setup`). Key files created:
+  - `package.json` — deps: `azure-pipelines-task-lib`; devDeps: `typescript`, `jest`, `ts-jest`, `@types/node`, `@types/jest`
+  - `tsconfig.json` — ES2020/NodeNext, rootDir=src, outDir=dist
+  - `vss-extension.json` — publisher `returngisorg`, 2 decorator contributions + 1 task contribution, private extension
+  - `decorator/copilot-failure-analysis.yml` — uses service connection via `connectedServiceName: 'GitHub Copilot CLI Decorator'` (replaces variable group approach per D2/D2-R)
+  - `src/copilot-failure-analysis-task/task.json` — includes `connectedService:ExternalServer` input for Generic service connection
+  - `azure-devops-extensions-dev.json` — version tracking at v0.1.0
+  - Placeholder `index.ts` to satisfy `tsc --noEmit`
+  - Directory scaffolding: `src/copilot-failure-analysis-task/`, `tests/`, `tests/fixtures/`, `scripts/`
+- 2026-03-03: Service connection change — org now uses a shared Generic (ExternalServer) service connection "GitHub Copilot CLI Decorator" containing the GitHub PAT. This replaces the Variable Group approach. No custom service endpoint contribution needed in manifest; built-in `ExternalServer` type suffices. Task.json uses `connectedService:ExternalServer` input type.
 
 ## Cross-Agent Updates
 

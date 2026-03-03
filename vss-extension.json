@@ -1,0 +1,68 @@
+{
+    "manifestVersion": 1,
+    "id": "copilot-failure-analysis",
+    "publisher": "returngisorg",
+    "version": "0.1.0",
+    "name": "GitHub Copilot Pipeline Failure Analyzer",
+    "description": "Automatically analyzes pipeline failures using AI and provides root cause analysis with fix suggestions.",
+    "categories": ["Azure Pipelines"],
+    "targets": [
+        { "id": "Microsoft.VisualStudio.Services" }
+    ],
+    "scopes": [],
+    "icons": {
+        "default": "logo.png"
+    },
+    "content": {
+        "details": { "path": "overview.md" }
+    },
+    "contributions": [
+        {
+            "id": "copilot-failure-analysis-decorator",
+            "type": "ms.azure-pipelines.pipeline-decorator",
+            "targets": [
+                "ms.azure-pipelines-agent-job.post-job-tasks"
+            ],
+            "properties": {
+                "template": "decorator/copilot-failure-analysis.yml"
+            }
+        },
+        {
+            "id": "copilot-test-decorator",
+            "type": "ms.azure-pipelines.pipeline-decorator",
+            "targets": [
+                "ms.azure-pipelines-agent-job.post-job-tasks"
+            ],
+            "properties": {
+                "template": "decorator/test-decorator.yml"
+            }
+        },
+        {
+            "id": "copilot-failure-analysis-task",
+            "type": "ms.azure-devops-server.build-release-task",
+            "targets": [
+                "ms.azure-pipelines-agent-job.post-job-tasks"
+            ],
+            "properties": {
+                "name": "src/copilot-failure-analysis-task"
+            }
+        },
+    ],
+    "files": [
+        {
+            "path": "decorator/copilot-failure-analysis.yml",
+            "addressable": true,
+            "contentType": "text/plain"
+        },
+        {
+            "path": "decorator/test-decorator.yml",
+            "addressable": true,
+            "contentType": "text/plain"
+        },
+        {
+            "path": "src/copilot-failure-analysis-task",
+            "addressable": true,
+            "packagePath": "copilot-failure-analysis-task"
+        }
+    ]
+}
