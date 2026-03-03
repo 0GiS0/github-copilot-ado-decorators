@@ -8,6 +8,13 @@
 
 ## Learnings
 - Joined the team on 2026-03-03 as Backend Dev
+- **Issue #3 completed (PR #26):** Implemented `config.ts` and `index.ts` entry point
+  - `readConfig()` reads PAT from Generic service connection via `tl.getEndpointAuthorizationParameter(connectedServiceName, 'password', false)`
+  - PAT masked immediately with `tl.setSecret()` — critical for security
+  - All error paths use `tl.TaskResult.SucceededWithIssues` — never exit non-zero (D7)
+  - Optional inputs (`maxLogLines`, `copilotNpxTimeout`) parsed with `parseInt` + `isNaN` fallback to defaults
+  - Key files: `src/copilot-failure-analysis-task/config.ts`, `src/copilot-failure-analysis-task/index.ts`
+  - Version bumped to `0.2.0` in `azure-devops-extensions-dev.json`
 
 ## Cross-Agent Updates
 
