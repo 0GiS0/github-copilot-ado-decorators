@@ -1,13 +1,13 @@
 # decorator/test-decorator.yml
 # Test/verification decorator — proves decorator injection is working.
 #
-# TEMPORARY: Removed compile-time gate for debugging.
-# This step will appear in ALL pipeline runs to verify injection.
+# This step appears in ALL pipeline runs to confirm the extension is active.
+# Opt-out: set pipeline variable COPILOT_TEST_DECORATOR_DISABLED=true.
 
 steps:
   - task: CmdLine@2
-    condition: always()
-    displayName: '✅ Copilot Extension Test (ALWAYS)'
+    condition: ne(variables['COPILOT_TEST_DECORATOR_DISABLED'], 'true')
+    displayName: '✅ Copilot Extension Test'
     inputs:
       script: |
         echo "✅ Copilot Failure Analysis extension is active"
@@ -17,3 +17,5 @@ steps:
         echo "   Project: $(System.TeamProject)"
         echo "   Pipeline: $(Build.DefinitionName)"
         echo "   Agent: $(Agent.MachineName) ($(Agent.OS))"
+        echo ""
+        echo "   To disable this step, set variable COPILOT_TEST_DECORATOR_DISABLED=true"
