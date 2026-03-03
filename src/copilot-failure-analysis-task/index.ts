@@ -1,5 +1,9 @@
 import * as tl from 'azure-pipelines-task-lib/task';
-import { readConfig } from './config';
+import { readConfig } from './config.js';
+import { getFailedStepLogs } from './log-collector.js';
+import { buildPrompt } from './prompt-builder.js';
+import { analyzeLogs } from './ai-analyzer.js';
+import { formatAndDisplay } from './output-formatter.js';
 
 /**
  * Main entry point for the Copilot Failure Analysis task.
@@ -24,19 +28,34 @@ async function run(): Promise<void> {
             return;
         }
 
-        // 3. Collect failed task logs (placeholder — will be implemented in #4)
-        // const logs = await collectLogs(config);
+        // 3. Collect failed task logs from the build timeline
+        const logs = await getFailedStepLogs(config);
 
-        // 4. Build prompt (placeholder — will be implemented in #5)
-        // const prompt = buildPrompt(config, logs);
+        if (logs.length === 0) {
+            tl.debug('No failed steps found — nothing to analyse');
+            tl.setResult(tl.TaskResult.Succeeded, 'No failed steps to analyse');
+            return;
+        }
 
-        // 5. Run Copilot analysis (placeholder — will be implemented in #6)
-        // const analysis = await analyzeLogs(prompt, config);
+        tl.debug(`Collected logs from ${logs.length} failed step(s)`);
 
-        // 6. Format output (placeholder — will be implemented in #7)
-        // await formatOutput(analysis, config);
+        // 4. Build the prompt for Copilot
+        const prompt = buildPrompt(config, logs);
 
-        tl.setResult(tl.TaskResult.Succeeded, 'Copilot analysis complete');
+        // 5. Run Copilot analysis
+        const analysis = await analyzeLogs(prompt, config);
+
+        // 6. Format and display results
+        await formatAndDisplay(analysis, config);
+
+        if (analysis.success) {
+            tl.setResult(tl.TaskResult.Succeeded, 'Copilot analysis complete');
+        } else {
+            tl.setResult(
+                tl.TaskResult.SucceededWithIssues,
+                `Analysis completed with issues: ${analysis.errorMessage ?? 'unknown'}`,
+            );
+        }
     } catch (error: unknown) {
         // NEVER fail the pipeline — surface as warning + SucceededWithIssues
         const message = error instanceof Error ? error.message : String(error);
