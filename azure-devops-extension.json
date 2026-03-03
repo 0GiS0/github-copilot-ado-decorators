@@ -36,16 +36,6 @@
             "properties": {
                 "template": "decorator/test-decorator.yml"
             }
-        },
-        {
-            "id": "copilot-failure-analysis-task",
-            "type": "ms.azure-devops-server.build-release-task",
-            "targets": [
-                "ms.azure-pipelines-agent-job"
-            ],
-            "properties": {
-                "name": "copilot-failure-analysis-task"
-            }
         }
     ],
     "files": [
@@ -58,11 +48,6 @@
             "path": "decorator/test-decorator.yml",
             "addressable": true,
             "contentType": "text/plain"
-        },
-        {
-            "path": "dist/copilot-failure-analysis-task",
-            "addressable": true,
-            "packagePath": "copilot-failure-analysis-task"
         }
     ]
 }

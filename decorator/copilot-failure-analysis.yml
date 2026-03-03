@@ -3,13 +3,241 @@
 #
 # This step only runs when the job has failed (runtime condition).
 # Opt-out: set pipeline variable COPILOT_ANALYSIS_DISABLED=true.
-# Service connection "GitHub Copilot CLI Decorator" provides the GitHub PAT.
+#
+# Prerequisites:
+#   1. Set pipeline variable COPILOT_GITHUB_PAT (secret) with a GitHub PAT
+#      that has an active Copilot license.
+#   2. Node.js must be available on the agent (for npx @github/copilot).
+#   3. Python 3 must be available on the agent (standard on hosted agents).
 
 steps:
-  - task: CopilotFailureAnalysis@1
+  - task: CmdLine@2
     condition: and(failed(), ne(variables['COPILOT_ANALYSIS_DISABLED'], 'true'))
+    continueOnError: true
     displayName: '🤖 Copilot Failure Analysis'
     inputs:
-      connectedServiceName: 'GitHub Copilot CLI Decorator'
+      script: |
+        # Locate Python interpreter
+        if command -v python3 &>/dev/null; then
+          PY=python3
+        elif command -v python &>/dev/null; then
+          PY=python
+        else
+          echo "##vso[task.logissue type=warning]Python not found on the agent. Skipping Copilot analysis."
+          exit 0
+        fi
+
+        $PY << 'COPILOT_ANALYSIS_SCRIPT'
+        import json, os, sys, subprocess, time
+        import urllib.request, urllib.error
+
+        # ── Configuration ──────────────────────────────────────
+        org_url   = os.environ.get('SYSTEM_TEAMFOUNDATIONCOLLECTIONURI', '').rstrip('/')
+        project   = os.environ.get('SYSTEM_TEAMPROJECT', '')
+        build_id  = os.environ.get('BUILD_BUILDID', '')
+        pipeline  = os.environ.get('BUILD_DEFINITIONNAME', '')
+        build_num = os.environ.get('BUILD_BUILDNUMBER', '')
+        branch    = os.environ.get('BUILD_SOURCEBRANCH', '')
+        agent_os  = os.environ.get('AGENT_OS', 'unknown')
+        ado_token = os.environ.get('SYSTEM_ACCESSTOKEN', '')
+        gh_pat    = os.environ.get('COPILOT_GITHUB_PAT', '')
+        max_lines = int(os.environ.get('COPILOT_MAX_LOG_LINES', '150'))
+        timeout_s = int(os.environ.get('COPILOT_CLI_TIMEOUT', '120'))
+        temp_dir  = os.environ.get('AGENT_TEMPDIRECTORY', '/tmp')
+
+        def warn(msg):
+            print(f"##vso[task.logissue type=warning]{msg}")
+
+        # ── Prerequisites ──────────────────────────────────────
+        if not gh_pat or gh_pat.startswith('$('):
+            warn("COPILOT_GITHUB_PAT variable not set. Skipping Copilot analysis.")
+            print("   Set COPILOT_GITHUB_PAT as a secret pipeline variable (or variable group)")
+            print("   with a GitHub PAT that has an active Copilot license.")
+            sys.exit(0)
+
+        if not ado_token or ado_token.startswith('$('):
+            warn("System.AccessToken not available. Skipping Copilot analysis.")
+            sys.exit(0)
+
+        def ado_get(url, accept='application/json'):
+            req = urllib.request.Request(url, headers={
+                'Authorization': f'Bearer {ado_token}',
+                'Accept': accept,
+            })
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                return resp.read().decode('utf-8', errors='replace')
+
+        # ── Phase 1: Collect failed step logs ──────────────────
+        print("\n🤖 Copilot Failure Analysis")
+        print("=" * 55)
+        print("\nPhase 1/4: Collecting failed step logs...")
+
+        try:
+            tl_url = f"{org_url}/{project}/_apis/build/builds/{build_id}/timeline?api-version=7.1"
+            timeline = json.loads(ado_get(tl_url))
+        except Exception as e:
+            warn(f"Failed to fetch build timeline: {e}")
+            sys.exit(0)
+
+        records = timeline.get('records', [])
+        failed = [r for r in records
+                  if r.get('result') == 'failed' and r.get('type') == 'Task']
+
+        if not failed:
+            print("  No failed steps found. Skipping analysis.")
+            sys.exit(0)
+
+        print(f"  Found {len(failed)} failed step(s)")
+
+        steps_data = []
+        for t in failed:
+            name = t.get('name', 'Unknown Step')
+            log_id = (t.get('log') or {}).get('id')
+            issues = [i['message'] for i in t.get('issues', []) if i.get('message')]
+            log = '[No log available]'
+            if log_id:
+                try:
+                    log_url = f"{org_url}/{project}/_apis/build/builds/{build_id}/logs/{log_id}?api-version=7.1"
+                    raw = ado_get(log_url, accept='text/plain')
+                    lines = raw.strip().split('\n')
+                    log = '\n'.join(lines[-max_lines:]) if len(lines) > max_lines else raw.strip()
+                except Exception as e:
+                    log = f'[Log unavailable: {e}]'
+            steps_data.append({'name': name, 'log': log, 'issues': issues})
+
+        # ── Phase 2: Build prompt ──────────────────────────────
+        print("Phase 2/4: Building analysis prompt...")
+
+        parts = [
+            "You are a CI/CD failure analyst. Analyze the following Azure DevOps "
+            "pipeline failure and provide actionable guidance.",
+            "",
+            "## Pipeline Context",
+            f"- **Pipeline:** {pipeline}",
+            f"- **Build number:** {build_num}",
+            f"- **Branch:** {branch}",
+            f"- **Agent OS:** {agent_os}",
+            "",
+            "## Failed Steps",
+        ]
+        for s in steps_data:
+            parts.append(f"\n### Step: {s['name']}")
+            if s['issues']:
+                parts.append("Issues:")
+                parts.extend(f"- {i}" for i in s['issues'])
+            parts.append("```")
+            parts.append(s['log'])
+            parts.append("```")
+
+        parts.extend([
+            "",
+            "## Response Format",
+            "Structure your response with:",
+            "1. **Root Cause** — One-sentence summary",
+            "2. **Details** — Technical explanation",
+            "3. **Suggested Fix** — Concrete steps to resolve",
+            "4. **Related Documentation** — Links if applicable",
+        ])
+
+        prompt = '\n'.join(parts)
+        if len(prompt) > 48 * 1024:
+            prompt = prompt[:48 * 1024] + "\n\n[...truncated...]"
+
+        print(f"  Prompt built — {len(prompt)} chars")
+
+        # ── Phase 3: Call Copilot CLI ──────────────────────────
+        print("Phase 3/4: Running Copilot analysis...")
+
+        prompt_file = os.path.join(temp_dir, 'copilot-prompt.txt')
+        with open(prompt_file, 'w') as f:
+            f.write(prompt)
+
+        analysis = ''
+        ok = False
+        t0 = time.time()
+
+        try:
+            env = dict(os.environ)
+            env['GITHUB_TOKEN'] = gh_pat
+            result = subprocess.run(
+                ['npx', '-y', '@github/copilot', '-sp', prompt],
+                capture_output=True, text=True, timeout=timeout_s, env=env,
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                analysis = result.stdout.strip()
+                ok = True
+            else:
+                err = (result.stderr or '').replace(gh_pat, '***').strip()
+                analysis = f"Copilot CLI exited with code {result.returncode}"
+                if err:
+                    analysis += f": {err}"
+        except subprocess.TimeoutExpired:
+            analysis = f"Copilot CLI timed out after {timeout_s}s"
+        except FileNotFoundError:
+            analysis = "npx not found — install Node.js on the agent"
+            warn(analysis)
+        except Exception as e:
+            analysis = f"Copilot CLI error: {str(e).replace(gh_pat, '***')}"
+
+        dur = time.time() - t0
+        print(f"  Analysis {'completed' if ok else 'failed'} ({dur:.1f}s)")
+
+        # ── Phase 4: Format and display ────────────────────────
+        print("Phase 4/4: Formatting results...")
+        ts = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
+
+        md = [
+            "# 🤖 Copilot Failure Analysis", "",
+            "## Pipeline Information", "",
+            "| Property | Value |",
+            "|----------|-------|",
+            f"| **Pipeline** | {pipeline} |",
+            f"| **Build Number** | {build_num} |",
+            f"| **Branch** | {branch} |",
+            f"| **Agent OS** | {agent_os} |",
+            f"| **Timestamp** | {ts} |",
+            "",
+        ]
+        if ok and analysis:
+            md.extend(["## Analysis", "", analysis, ""])
+        elif not ok:
+            md.extend(["## ⚠️ Analysis Error", "",
+                        "The AI analysis could not be completed.", "",
+                        f"**Error:** {analysis}", f"**Duration:** {dur:.1f}s", ""])
+        else:
+            md.extend(["## Analysis", "",
+                        "_No analysis available — empty AI response._", ""])
+
+        md.extend([
+            "---", "",
+            f"_Analysis completed in {dur:.1f}s_", "",
+            "> **Disclaimer:** This analysis is generated by AI and may not be fully accurate.",
+            "> Always verify suggestions before applying changes.",
+        ])
+
+        report = '\n'.join(md)
+        report_file = os.path.join(temp_dir, 'copilot-analysis.md')
+        try:
+            with open(report_file, 'w') as f:
+                f.write(report)
+            print(f"##vso[task.uploadsummary]{report_file}")
+        except Exception as e:
+            warn(f"Failed to write report: {e}")
+
+        # Console output
+        print("\n" + "=" * 55)
+        print("  🤖  COPILOT FAILURE ANALYSIS")
+        print("=" * 55 + "\n")
+        print(analysis if (ok and analysis) else f"⚠️  {analysis}" if not ok else "No analysis available.")
+        print("\n" + "=" * 55)
+
+        # Cleanup
+        try:
+            os.remove(prompt_file)
+        except OSError:
+            pass
+
+        COPILOT_ANALYSIS_SCRIPT
     env:
       SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+      COPILOT_GITHUB_PAT: $(COPILOT_GITHUB_PAT)
