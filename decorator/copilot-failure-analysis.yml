@@ -1,0 +1,15 @@
+# decorator/copilot-failure-analysis.yml
+# Pipeline decorator — injects a post-job step that analyzes failures using GitHub Copilot.
+#
+# This step only runs when the job has failed (runtime condition).
+# Opt-out: set pipeline variable COPILOT_ANALYSIS_DISABLED=true.
+# Service connection "GitHub Copilot CLI Decorator" provides the GitHub PAT.
+
+steps:
+  - task: CopilotFailureAnalysis@0
+    condition: and(failed(), ne(variables['COPILOT_ANALYSIS_DISABLED'], 'true'))
+    displayName: '🤖 Copilot Failure Analysis'
+    inputs:
+      connectedServiceName: 'GitHub Copilot CLI Decorator'
+    env:
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)

@@ -13,12 +13,16 @@ Use direct HTTPS calls to GitHub Models API via Node.js `https` module. Rejected
 Use `npx @github/copilot -sp "prompt"` for log analysis. Zero-install, silent prompt mode, Copilot handles model routing. Requires Node.js 22+.
 
 ## D2: PAT Storage — Variable Group with Secret Variable
-**Date:** 2026-03-03 | **Author:** Keaton | **Status:** Updated by D2-R
+**Date:** 2026-03-03 | **Author:** Keaton | **Status:** Superseded by D2-SC
 Store GitHub PAT in ADO Variable Group (`CopilotFailureAnalysis`) as secret variable `COPILOT_GITHUB_PAT`.
 
 ## D2-R: PAT Authentication — GITHUB_TOKEN for Copilot CLI (UPDATES D2)
-**Date:** 2026-03-03 | **Author:** Keaton | **Status:** Proposed
+**Date:** 2026-03-03 | **Author:** Keaton | **Status:** Superseded by D2-SC
 Decorator sets `GITHUB_TOKEN` env var from `COPILOT_GITHUB_PAT`. CLI reads `GITHUB_TOKEN`. PAT needs active Copilot license, no special scope.
+
+## D2-SC: PAT Authentication — Service Connection (SUPERSEDES D2, D2-R)
+**Date:** 2026-03-03 | **Author:** Keaton | **Status:** Proposed
+GitHub PAT stored in a **Generic (ExternalServer) service connection** named **"GitHub Copilot CLI Decorator"**. Task reads PAT via `tl.getEndpointAuthorizationParameter(connectedServiceName, 'password', false)`. Decorator YAML passes service connection name as task input (`connectedServiceName: 'GitHub Copilot CLI Decorator'`). Service connection must have "Grant access permission to all pipelines" enabled. `SYSTEM_ACCESSTOKEN` still comes from `$(System.AccessToken)` as env var. Supersedes Variable Group (D2) and env var (D2-R) approaches.
 
 ## D3: Output — Pipeline Run Summary (Markdown)
 **Date:** 2026-03-03 | **Author:** Keaton | **Status:** Proposed

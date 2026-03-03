@@ -265,74 +265,38 @@ tfx extension install \
 
 ---
 
-## Phase E: Configure the GitHub PAT
+## Phase E: Configure the GitHub PAT (Service Connection)
 
-The extension needs a GitHub PAT (with Copilot license) to call the Copilot CLI. There are two approaches:
+The extension needs a GitHub PAT (with Copilot license) to call the Copilot CLI. The PAT is stored in an **Azure DevOps service connection** of type Generic (ExternalServer).
 
-### Option 1: Variable Group (Recommended for org-wide use)
+### Create the Service Connection
 
-This is the recommended approach — create a variable group that can be linked to multiple pipelines.
+1. Go to your Azure DevOps project: `https://dev.azure.com/<your-org>/<your-project>`
+2. Click **Project settings** (bottom-left gear icon)
+3. Under **Pipelines**, click **Service connections**
+4. Click **New service connection**
+5. Select **Generic** (also shown as "External Server")
+6. Fill in:
+   - **Server URL:** `https://github.com` (placeholder — the task does not use this URL)
+   - **Password/Token Key:** Paste your GitHub PAT (the one with an active Copilot license)
+   - **Service connection name:** `GitHub Copilot CLI Decorator` (must match exactly)
+   - **Description:** *(optional)* GitHub PAT for Copilot CLI failure analysis
+   - **☑ Grant access permission to all pipelines:** **Check this box** — critical because the decorator injects into all pipelines automatically
+7. Click **Save**
 
-**Step 1 — Create the Variable Group:**
+> **Important:** The "Grant access permission to all pipelines" checkbox must be enabled. Without it, each pipeline would need individual authorization to use the service connection, which defeats the purpose of an org-wide decorator.
 
-1. Go to **Pipelines** → **Library** in your Azure DevOps project
-2. Click **+ Variable group**
-3. Name it: `CopilotFailureAnalysis`
-4. Add a variable:
-   - **Name:** `COPILOT_GITHUB_PAT`
-   - **Value:** Paste your GitHub PAT
-   - **Click the lock icon** 🔒 to make it a secret variable
-5. Click **Save**
+> **Security:** Service connection credentials are encrypted at rest, managed by Azure DevOps, and masked in pipeline logs. The PAT value will never be displayed in plain text.
 
-> **Security:** Secret variables are encrypted at rest and masked in pipeline logs. The PAT value will never be displayed in plain text.
+### Verify the Service Connection
 
-**Step 2 — Link the Variable Group to pipelines:**
+1. Go to **Project settings** → **Service connections**
+2. Find **GitHub Copilot CLI Decorator** in the list
+3. Click on it and verify:
+   - Status shows as configured
+   - "Grant access permission to all pipelines" is enabled (check under **Security**)
 
-In each pipeline YAML that should have Copilot analysis, add:
-
-```yaml
-variables:
-  - group: CopilotFailureAnalysis
-```
-
-Or for pipelines with multiple variable groups:
-
-```yaml
-variables:
-  - group: CopilotFailureAnalysis
-  - group: OtherVariableGroup
-```
-
-**For org-wide coverage via pipeline templates:**
-
-If your organization uses centralized pipeline templates, add the variable group reference in the template so all pipelines inherit it automatically.
-
-**Step 3 — Set Variable Group permissions:**
-
-1. In the **Library**, click on the `CopilotFailureAnalysis` variable group
-2. Click **Pipeline permissions**
-3. Either allow all pipelines or authorize specific pipelines to use this group
-
-### Option 2: Pipeline-level variable
-
-For individual pipelines, you can set the variable directly:
-
-```yaml
-variables:
-  COPILOT_GITHUB_PAT: $(CopilotPAT)  # Reference a secret variable
-```
-
-Or set it via the pipeline UI:
-
-1. Edit the pipeline
-2. Click **Variables**
-3. Add:
-   - **Name:** `COPILOT_GITHUB_PAT`
-   - **Value:** Your GitHub PAT
-   - **Check** "Keep this value secret"
-4. Click **Save**
-
-> **Note:** If `COPILOT_GITHUB_PAT` is not configured for a pipeline, the analysis step simply logs "Copilot analysis skipped — PAT not configured" and exits cleanly. It will NOT fail the pipeline.
+> **Note:** If the service connection is not configured or not accessible, the analysis step simply logs "Copilot analysis skipped — service connection not configured" and exits cleanly. It will NOT fail the pipeline.
 
 ---
 
@@ -507,13 +471,14 @@ Run a pipeline and check the extension version in the step output to confirm the
 | Decorator contributions cache | Wait a few minutes after installation. ADO caches decorator contributions and may take up to 5 minutes to pick up a new decorator |
 | Wrong contribution targets | Verify `vss-extension.json` has the correct target: `ms.azure-pipelines-agent-job.post-job-tasks` |
 
-### Analysis step runs but outputs "Copilot analysis skipped — PAT not configured"
+### Analysis step runs but outputs "Copilot analysis skipped — service connection not configured"
 
 | Possible Cause | Fix |
 |---|---|
-| Variable group not linked | Add `- group: CopilotFailureAnalysis` to the pipeline's variables section |
-| Variable name mismatch | Ensure the variable is named exactly `COPILOT_GITHUB_PAT` (case-sensitive) |
-| Variable group permissions | Go to Library → Variable Group → Pipeline permissions and authorize the pipeline |
+| Service connection not created | Create a Generic service connection named exactly `GitHub Copilot CLI Decorator` in Project Settings → Service connections |
+| Service connection name mismatch | The name must be exactly `GitHub Copilot CLI Decorator` (case-sensitive) |
+| "Grant access to all pipelines" not enabled | Edit the service connection → Security → enable "Grant access permission to all pipelines" |
+| Service connection in wrong project | The service connection must exist in the same project where the pipeline runs |
 
 ### Copilot CLI fails or times out
 

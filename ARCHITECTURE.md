@@ -14,7 +14,7 @@ This extension installs an **Azure DevOps pipeline decorator** that automaticall
 2. Sends the logs to the **GitHub Copilot CLI** (`@github/copilot`) for root cause analysis
 3. Displays fix suggestions as a **Pipeline Run Summary** (Markdown) and in the step output
 
-The extension is entirely server-side — no UI hub pages are required (v1). Authentication to the Copilot CLI uses a GitHub PAT (with Copilot license) stored as an organization-level pipeline variable and exposed as `GITHUB_TOKEN`.
+The extension is entirely server-side — no UI hub pages are required (v1). Authentication to the Copilot CLI uses a GitHub PAT (with Copilot license) stored in an **Azure DevOps service connection** named **"GitHub Copilot CLI Decorator"** (type: Generic / ExternalServer). The task reads the PAT at runtime via the ADO Task SDK.
 
 ---
 
@@ -32,7 +32,7 @@ Pipeline Job Fails
        ▼
 ┌──────────────────────────────────────────────┐
 │  Step 1: Validate PAT availability           │
-│  - Check $(COPILOT_GITHUB_PAT) is set       │
+│  - Read PAT from service connection input    │
 │  - If missing, log warning and exit cleanly  │
 └──────────────────────────────────────────────┘
        │
@@ -50,7 +50,7 @@ Pipeline Job Fails
 │  Step 3: Ensure Copilot CLI available        │
 │  - Check if `copilot` is on PATH            │
 │  - If not, use npx @github/copilot          │
-│  - Set GITHUB_TOKEN from COPILOT_GITHUB_PAT │
+│  - Set GITHUB_TOKEN from service connection  │
 └──────────────────────────────────────────────┘
        │
        ▼
@@ -101,34 +101,44 @@ Rationale:
 
 **Fallback consideration:** If the Copilot CLI is unavailable or fails, the step exits cleanly with a warning. A Phase 2 enhancement could fall back to direct GitHub Models API calls.
 
-### 3.2 PAT Storage: Organization-Level Pipeline Variable
+### 3.2 PAT Storage: Service Connection (Generic / ExternalServer)
 
 **Options evaluated:**
 
 | Option | Pros | Cons |
 |---|---|---|
 | Extension Data Service + Settings Hub | Clean UX, org-scoped | Requires hub UI contribution, REST call to fetch at runtime, adds complexity |
-| Service Endpoint (Service Connection) | Native ADO pattern, secure | Project-scoped (not org-wide), decorator can't reference endpoints directly |
-| Pipeline Variable Group | Simple, familiar | Must be linked to each pipeline manually — doesn't scale for org-wide |
-| Organization-level pipeline variable | Simple, org-wide, works with decorators | Requires admin CLI/API to set, not as discoverable |
+| Pipeline Variable Group | Simple, familiar | Must be linked to each pipeline manually — doesn't scale for org-wide decorator |
+| Organization-level pipeline variable | Simple, org-wide | Requires admin CLI/API to set, not as discoverable |
+| **Service Connection (Generic)** | **Native ADO pattern, secure, org-wide with "Grant access to all pipelines"** | Requires org admin to create |
 
-**Decision: Organization-level pipeline variable** named `COPILOT_GITHUB_PAT`.
+**Decision: Service Connection** named **"GitHub Copilot CLI Decorator"** (type: Generic / ExternalServer).
+
+This supersedes the previous Variable Group approach (D2) and the GITHUB_TOKEN env var approach (D2-R). See decision **D2-SC**.
 
 How it works:
-1. Org admin creates a **Variable Group** named `CopilotFailureAnalysis` in the ADO Library.
-2. The variable group contains a **secret variable** `COPILOT_GITHUB_PAT` — a GitHub PAT from an account with an active **Copilot license**.
-3. Pipelines that want Copilot analysis **link this variable group** (can be done globally via pipeline templates or per-pipeline).
-4. The decorator step sets `GITHUB_TOKEN` from `COPILOT_GITHUB_PAT` so the Copilot CLI picks it up automatically.
-5. If `$(COPILOT_GITHUB_PAT)` is not set, the step logs "Copilot analysis skipped — PAT not configured" and exits cleanly (exit 0).
+1. Org admin creates a **service connection** of type **Generic** in the ADO project settings (Project Settings → Service connections).
+2. The service connection is named **"GitHub Copilot CLI Decorator"** and stores the GitHub PAT in its **Password/Token Key** field.
+3. The admin enables **"Grant access permission to all pipelines"** — this is critical because the decorator injects into ALL pipelines.
+4. The decorator YAML passes the service connection name as a task input: `connectedServiceName: 'GitHub Copilot CLI Decorator'`.
+5. The task reads the PAT at runtime via `tl.getEndpointAuthorizationParameter(connectedServiceName, 'password', false)`.
+6. The task sets `GITHUB_TOKEN` in the child process environment for the Copilot CLI.
+7. If the service connection is not accessible or the PAT is missing, the step logs "Copilot analysis skipped — service connection not configured" and exits cleanly (exit 0).
 
 **PAT requirements:**
 - The GitHub PAT must be from an account/org with an active **GitHub Copilot** license (Individual, Business, or Enterprise).
 - The Copilot CLI authenticates via the `GITHUB_TOKEN` environment variable (standard GitHub authentication pattern, also supported as `GH_TOKEN`).
 - No special PAT scope like `models:read` is needed — the Copilot license on the account is what grants access.
 
-**Why not Extension Data Service (v1)?** Adding a settings hub contribution requires the Extension SDK, React UI, webpack bundling, and a REST call at runtime to fetch the PAT. This is significant complexity for v1. The variable group approach is simple, secure (secret variables are encrypted), and familiar to ADO administrators.
+**Why service connection over Variable Group?**
+- Service connections are the ADO-native pattern for external service credentials.
+- "Grant access to all pipelines" makes it work seamlessly with a decorator that injects into every pipeline — no per-pipeline variable group linking required.
+- The ADO Task SDK provides `getEndpointAuthorizationParameter()` specifically for reading credentials from service connections.
+- Org admins manage service connections centrally in Project Settings — familiar, secure, auditable.
 
-**v2 enhancement:** Add a lightweight settings hub where admins paste the PAT, stored via Extension Data Service. The task first checks for the variable, then falls back to Extension Data Service.
+**`SYSTEM_ACCESSTOKEN` is unchanged:** The ADO REST API token (`System.AccessToken`) continues to be passed as an environment variable. It is auto-provided by the pipeline and is not a service connection.
+
+**v2 enhancement:** Add a lightweight settings hub where admins can configure the service connection name, stored via Extension Data Service. The task first checks the input, then falls back to a well-known default name.
 
 ### 3.3 Log Collection Strategy
 
@@ -408,7 +418,7 @@ github-copilot-ado-decorators/
 
 **Notes:**
 - **Private extension only.** Pipeline decorators can only be contributed by private extensions. This extension must be shared privately with target organizations — it cannot be listed on the public marketplace.
-- **No scopes needed.** The decorator step uses `System.AccessToken` (auto-provided) for ADO API calls, and the GitHub PAT from a pipeline variable. No extension-specific OAuth scopes are required.
+- **No scopes needed.** The decorator step uses `System.AccessToken` (auto-provided) for ADO API calls, and the GitHub PAT from a service connection. No extension-specific OAuth scopes are required.
 - **Contribution type.** All pipeline decorators use `ms.azure-pipelines.pipeline-decorator` as their contribution `type`, regardless of where they inject (pre-job, post-job, etc.). The `targets` array determines the injection point — we use `ms.azure-pipelines-agent-job.post-job-tasks` to inject after all job steps complete.
 - **Post-job injection.** The `post-job-tasks` target ensures the decorator step is injected after all other steps in the job. The `condition: failed()` on the step further limits execution to failures only — the step is always injected but only runs when the job has failures.
 - **File entry with contentType.** The decorator YAML file entry must specify the exact file path and `contentType: "text/plain"` per the official docs.
@@ -423,8 +433,9 @@ steps:
   - task: CopilotFailureAnalysis@0
     condition: and(failed(), ne(variables['COPILOT_ANALYSIS_DISABLED'], 'true'))
     displayName: '🤖 Copilot Failure Analysis'
+    inputs:
+      connectedServiceName: 'GitHub Copilot CLI Decorator'
     env:
-      GITHUB_TOKEN: $(COPILOT_GITHUB_PAT)
       SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 ```
 
@@ -499,6 +510,13 @@ This is correct per the official docs: `${{ if }}` expressions at the template l
     },
     "inputs": [
         {
+            "name": "connectedServiceName",
+            "type": "connectedService:ExternalServer",
+            "label": "GitHub Copilot Service Connection",
+            "required": true,
+            "helpMarkDown": "Service connection (Generic/ExternalServer) containing the GitHub PAT for Copilot CLI authentication. Must have 'Grant access permission to all pipelines' enabled."
+        },
+        {
             "name": "maxLogLines",
             "type": "string",
             "label": "Max Log Lines Per Step",
@@ -565,13 +583,16 @@ interface FailedStepLog {
 ### 6.3 ai-analyzer.ts — Copilot CLI Client
 
 Responsibilities:
+- Read the GitHub PAT from the service connection via `tl.getEndpointAuthorizationParameter()`
 - Execute `npx @github/copilot -sp "prompt"` via `child_process.execFile`
 - Set `GITHUB_TOKEN` in the child process environment
 - Handle process exit codes and timeouts
 - Capture stdout as the analysis result
-- Handle errors (CLI not found, auth failure, timeout)
+- Handle errors (CLI not found, auth failure, timeout, service connection missing)
 
 ```typescript
+import * as tl from 'azure-pipelines-task-lib/task';
+
 interface AnalysisResult {
     analysisText: string;   // Raw Copilot response (Markdown)
     success: boolean;
@@ -580,12 +601,19 @@ interface AnalysisResult {
 
 // Implementation approach:
 async function analyzeLogs(prompt: string, config: TaskConfig): Promise<AnalysisResult> {
-    // 1. Spawn: npx @github/copilot -sp "prompt"
-    //    - env: { ...process.env, GITHUB_TOKEN: config.githubPat }
+    // 1. Read PAT from service connection
+    //    const connectedServiceName = tl.getInput('connectedServiceName', true)!;
+    //    const githubPat = tl.getEndpointAuthorizationParameter(
+    //        connectedServiceName, 'password', false
+    //    )!;
+    //    tl.setSecret(githubPat);  // Mask in logs
+    //
+    // 2. Spawn: npx @github/copilot -sp "prompt"
+    //    - env: { ...process.env, GITHUB_TOKEN: githubPat }
     //    - timeout: config.copilotTimeout (default 120s)
-    // 2. Capture stdout
-    // 3. If exit code !== 0, return { success: false, errorMessage }
-    // 4. Return { analysisText: stdout, success: true }
+    // 3. Capture stdout
+    // 4. If exit code !== 0, return { success: false, errorMessage }
+    // 5. Return { analysisText: stdout, success: true }
 }
 ```
 
@@ -615,7 +643,7 @@ Responsibilities:
 
 ```typescript
 interface TaskConfig {
-    githubPat: string;
+    connectedServiceName: string;  // Service connection name for GitHub PAT
     adoToken: string;
     orgUrl: string;
     project: string;
@@ -642,7 +670,7 @@ npx @github/copilot -sp "Your prompt here"
 
 **Environment:**
 ```bash
-GITHUB_TOKEN={COPILOT_GITHUB_PAT}   # Required — Copilot CLI reads this for auth
+GITHUB_TOKEN={PAT from service connection}   # Required — Copilot CLI reads this for auth
 ```
 
 **Flags:**
@@ -653,20 +681,29 @@ GITHUB_TOKEN={COPILOT_GITHUB_PAT}   # Required — Copilot CLI reads this for au
 | `-s` | Silent mode modifier — suppresses non-response output |
 
 **Authentication flow in CI:**
-1. The decorator YAML sets `GITHUB_TOKEN` from `$(COPILOT_GITHUB_PAT)`
-2. The task passes `GITHUB_TOKEN` in the child process environment
-3. The Copilot CLI reads `GITHUB_TOKEN` for authentication (standard GitHub auth pattern)
-4. The PAT must be from an account with an active Copilot license
+1. The decorator YAML passes the service connection name as a task input: `connectedServiceName: 'GitHub Copilot CLI Decorator'`
+2. The task reads the PAT from the service connection via `tl.getEndpointAuthorizationParameter(connectedServiceName, 'password', false)`
+3. The task sets `GITHUB_TOKEN` in the child process environment for the Copilot CLI
+4. The Copilot CLI reads `GITHUB_TOKEN` for authentication (standard GitHub auth pattern)
+5. The PAT must be from an account with an active Copilot license
 
 **Alternative auth env vars:** The CLI likely also supports `GH_TOKEN` (GitHub CLI convention). We use `GITHUB_TOKEN` as it's the most standard.
 
 **Node.js execution:**
 ```typescript
 import { execFile } from 'child_process';
+import * as tl from 'azure-pipelines-task-lib/task';
+
+// Read PAT from service connection
+const connectedServiceName = tl.getInput('connectedServiceName', true)!;
+const githubPat = tl.getEndpointAuthorizationParameter(
+    connectedServiceName, 'password', false
+)!;
+tl.setSecret(githubPat);
 
 const result = await new Promise<string>((resolve, reject) => {
     execFile('npx', ['@github/copilot', '-sp', prompt], {
-        env: { ...process.env, GITHUB_TOKEN: pat },
+        env: { ...process.env, GITHUB_TOKEN: githubPat },
         timeout: 120_000,  // 2 minutes
         maxBuffer: 1024 * 1024,  // 1 MB output buffer
     }, (error, stdout, stderr) => {
@@ -696,7 +733,7 @@ Authorization: Bearer {System.AccessToken}
 
 | Scenario | Handling |
 |---|---|
-| `COPILOT_GITHUB_PAT` not set | Log warning, exit 0 (don't fail the pipeline further) |
+| Service connection not accessible or PAT missing | Log warning, exit 0 (don't fail the pipeline further) |
 | ADO API call fails | Log error with HTTP status, exit 0 |
 | `npx @github/copilot` not found / fails to install | Log error ("Copilot CLI unavailable"), exit 0 |
 | Copilot CLI auth failure (invalid PAT / no Copilot license) | Log error with CLI stderr, exit 0 |
@@ -725,7 +762,7 @@ variables:
 
 ## 9. Security Considerations
 
-1. **GitHub PAT as secret variable:** The PAT is stored as a secret in the variable group. ADO masks secret values in logs. The task must not log the PAT (use `task.setSecret()`).
+1. **GitHub PAT in service connection:** The PAT is stored in a Generic (ExternalServer) service connection named "GitHub Copilot CLI Decorator". ADO manages service connection credentials securely. The task reads the PAT via `tl.getEndpointAuthorizationParameter()` and must call `tl.setSecret()` to ensure it is masked in logs.
 
 2. **System.AccessToken scope:** The auto-provided token has read access to build logs by default. No additional configuration needed.
 
@@ -832,3 +869,4 @@ variables:
 | Q6 | npx caching behavior on ADO agents — does it persist across pipeline runs? | Microsoft-hosted: no (ephemeral). Self-hosted: yes (cached in npm cache) |
 | Q7 | Exact `GITHUB_TOKEN` vs `GH_TOKEN` behavior for Copilot CLI auth in CI? | Validate during Phase 1 |
 | Q8 | Private extension sharing workflow — automate via `tfx extension share` in CI? | Define during Phase 1 |
+| Q9 | Does "Grant access to all pipelines" on a service connection apply to decorator-injected task inputs, or only tasks explicitly in pipeline YAML? | Must validate in Phase 1 |
