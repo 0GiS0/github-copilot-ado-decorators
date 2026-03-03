@@ -1,26 +1,19 @@
 # decorator/test-decorator.yml
 # Test/verification decorator — proves decorator injection is working.
 #
-# Compile-time gate: only injected when COPILOT_TEST_MODE is set to 'true'.
-# This prevents the step from appearing in normal pipeline runs.
-# Admins set COPILOT_TEST_MODE=true at org/pipeline level to verify the extension.
-#
-# Runtime opt-out: can be disabled per-pipeline via COPILOT_TEST_DECORATOR_DISABLED.
+# TEMPORARY: Removed compile-time gate for debugging.
+# This step will appear in ALL pipeline runs to verify injection.
 
 steps:
-  - ${{ if eq(variables['COPILOT_TEST_MODE'], 'true') }}:
-    - task: CmdLine@2
-      condition: ne(variables['COPILOT_TEST_DECORATOR_DISABLED'], 'true')
-      displayName: '✅ Copilot Extension Test'
-      inputs:
-        script: |
-          echo "✅ Copilot Failure Analysis extension is active"
-          echo "   Decorator injection is working correctly."
-          echo ""
-          echo "   Organization: $(System.TeamFoundationCollectionUri)"
-          echo "   Project: $(System.TeamProject)"
-          echo "   Pipeline: $(Build.DefinitionName)"
-          echo "   Agent: $(Agent.MachineName) ($(Agent.OS))"
-          echo ""
-          echo "   To disable this test step, set variable COPILOT_TEST_DECORATOR_DISABLED=true"
-          echo "   To stop test mode entirely, remove the COPILOT_TEST_MODE variable"
+  - task: CmdLine@2
+    condition: always()
+    displayName: '✅ Copilot Extension Test (ALWAYS)'
+    inputs:
+      script: |
+        echo "✅ Copilot Failure Analysis extension is active"
+        echo "   Decorator injection is working correctly."
+        echo ""
+        echo "   Organization: $(System.TeamFoundationCollectionUri)"
+        echo "   Project: $(System.TeamProject)"
+        echo "   Pipeline: $(Build.DefinitionName)"
+        echo "   Agent: $(Agent.MachineName) ($(Agent.OS))"
