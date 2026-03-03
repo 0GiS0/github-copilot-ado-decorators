@@ -1,0 +1,36 @@
+{
+  "agents": [
+    {
+      "persistent_name": "Keaton",
+      "universe": "The Usual Suspects",
+      "role": "Lead",
+      "created_at": "2026-03-03T12:00:00.000Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    {
+      "persistent_name": "Verbal",
+      "universe": "The Usual Suspects",
+      "role": "Backend Dev",
+      "created_at": "2026-03-03T12:00:00.000Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    {
+      "persistent_name": "McManus",
+      "universe": "The Usual Suspects",
+      "role": "DevOps / Pipeline Specialist",
+      "created_at": "2026-03-03T12:00:00.000Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    {
+      "persistent_name": "Hockney",
+      "universe": "The Usual Suspects",
+      "role": "Tester",
+      "created_at": "2026-03-03T12:00:00.000Z",
+      "legacy_named": false,
+      "status": "active"
+    }
+  ]
+}

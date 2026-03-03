@@ -1,0 +1,22 @@
+{
+  "universe_usage_history": [
+    {
+      "universe": "The Usual Suspects",
+      "used_at": "2026-03-03T12:00:00.000Z",
+      "project": "github-copilot-ado-decorators"
+    }
+  ],
+  "assignment_cast_snapshots": {
+    "assignment-001": {
+      "assignment_id": "assignment-001",
+      "universe": "The Usual Suspects",
+      "created_at": "2026-03-03T12:00:00.000Z",
+      "agents": [
+        { "name": "Keaton", "role": "Lead" },
+        { "name": "Verbal", "role": "Backend Dev" },
+        { "name": "McManus", "role": "DevOps / Pipeline Specialist" },
+        { "name": "Hockney", "role": "Tester" }
+      ]
+    }
+  }
+}
