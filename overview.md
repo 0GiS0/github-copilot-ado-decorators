@@ -1,28 +1,36 @@
 # GitHub Copilot Pipeline Failure Analyzer
 
-Automatically analyzes Azure DevOps pipeline failures using GitHub Copilot and provides AI-powered root cause analysis with actionable fix suggestions.
+Automatically analyzes Azure DevOps pipeline failures using **GitHub Copilot** and provides AI-powered root cause analysis with actionable fix suggestions — right in your Pipeline Run Summary.
 
-## Features
+## Key Features
 
-- **Automatic failure detection** — Runs as a post-job decorator on every pipeline, activating only when a job fails.
-- **AI-powered analysis** — Sends pipeline logs to GitHub Copilot for intelligent root cause analysis.
-- **Actionable suggestions** — Provides specific fix recommendations directly in the pipeline run summary.
-- **Zero configuration** — Installs as a pipeline decorator; no changes to existing pipeline YAML required.
-- **Safe by design** — Never fails your pipeline. All analysis errors are handled gracefully.
+- **Fully automatic** — Installs as a pipeline decorator. No changes to your pipeline YAML. Activates only when a job fails; zero overhead on successful runs.
+- **AI-powered root cause analysis** — Sends failed task logs to GitHub Copilot for intelligent analysis including root cause, detailed breakdown, and specific fix recommendations.
+- **Results in Pipeline Run Summary** — Analysis appears in the **Extensions tab** of your pipeline run, persistent and accessible to the whole team.
+- **Safe by design** — The analysis step never fails your pipeline. All errors are handled gracefully with warnings.
+- **Easy opt-out** — Disable for any pipeline by setting `COPILOT_ANALYSIS_DISABLED=true`.
 
 ## How It Works
 
-1. The extension installs a pipeline decorator that runs after every job.
-2. When a job fails, the decorator collects the relevant logs.
-3. Logs are sent to GitHub Copilot for analysis.
-4. The AI-generated analysis appears in the pipeline run summary (Extensions tab).
+1. The extension installs a **pipeline decorator** that injects a post-job step into every agent job.
+2. When a job **fails**, the step collects the relevant logs from the Azure DevOps REST API.
+3. Logs are sent to **GitHub Copilot CLI** for root cause analysis.
+4. The AI-generated analysis — including root cause, details, and suggested fixes — appears in the **Pipeline Run Summary** (Extensions tab) and in the step output.
+
+## Getting Started
+
+1. **Install the extension** in your Azure DevOps organization (shared privately).
+2. **Create a Generic service connection** named `GitHub Copilot CLI Decorator` in Project Settings → Service connections.
+3. **Paste your GitHub PAT** (from a Copilot-licensed account) into the Password/Token Key field.
+4. **Enable "Grant access permission to all pipelines"** on the service connection.
+5. That's it — the next time a pipeline fails, you'll see Copilot's analysis in the run summary.
 
 ## Requirements
 
 - Azure DevOps organization with the extension installed
-- A Generic service connection named **"GitHub Copilot CLI Decorator"** containing a GitHub PAT with an active Copilot license
-- Node.js 22+ available on the build agent
+- A Generic service connection named **"GitHub Copilot CLI Decorator"** with a GitHub PAT from a Copilot-licensed account
+- Node.js available on the build agent (included on Microsoft-hosted agents)
 
-## Getting Started
+> **Note:** A logo for the marketplace listing is pending.
 
-See [DEPLOYMENT.md](DEPLOYMENT.md) for full installation and configuration instructions.
+For full deployment and configuration details, see the [README](https://github.com/returngis/github-copilot-ado-decorators#readme).
