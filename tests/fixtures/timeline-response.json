@@ -1,0 +1,58 @@
+{
+    "records": [
+        {
+            "id": "record-001",
+            "parentId": "job-001",
+            "type": "Task",
+            "name": "npm install",
+            "state": "completed",
+            "result": "succeeded",
+            "order": 1,
+            "log": {
+                "id": 10,
+                "type": "Container",
+                "url": "https://dev.azure.com/myorg/myproject/_apis/build/builds/123/logs/10"
+            },
+            "issues": []
+        },
+        {
+            "id": "record-002",
+            "parentId": "job-001",
+            "type": "Task",
+            "name": "Run unit tests",
+            "state": "completed",
+            "result": "failed",
+            "order": 2,
+            "log": {
+                "id": 11,
+                "type": "Container",
+                "url": "https://dev.azure.com/myorg/myproject/_apis/build/builds/123/logs/11"
+            },
+            "issues": [
+                {
+                    "type": "error",
+                    "message": "Process completed with exit code 1."
+                },
+                {
+                    "type": "error",
+                    "message": "Jest test suite failed: 3 tests failed out of 42."
+                }
+            ]
+        },
+        {
+            "id": "record-003",
+            "parentId": null,
+            "type": "Job",
+            "name": "Build Job",
+            "state": "completed",
+            "result": "failed",
+            "order": 1,
+            "log": {
+                "id": 1,
+                "type": "Container",
+                "url": "https://dev.azure.com/myorg/myproject/_apis/build/builds/123/logs/1"
+            },
+            "issues": []
+        }
+    ]
+}
