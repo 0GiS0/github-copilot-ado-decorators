@@ -38,3 +38,16 @@ Keaton corrected the extension manifest structure in ARCHITECTURE.md (D10–D15)
 Keaton created `DEPLOYMENT.md` — 8-phase deployment guide covering prerequisites, build, publish, install, PAT config, test verification (using McManus's test decorator in Phase F), failure analysis testing, and updates. Troubleshooting section covers 10 common issues. Updated ARCHITECTURE.md Section 11 with link.
 
 **Impact on McManus:** Phase F of the deployment guide references the test decorator (`COPILOT_TEST_MODE`). Ensure test decorator YAML and manifest contribution stay aligned with the deployment instructions.
+
+- 2026-03-03: CI/CD pipeline setup (PR #27, branch `feature/cicd-publish`). Key changes:
+  - Renamed `vss-extension.json` → `azure-devops-extension.json` (production manifest) following reference project convention
+  - Created proper `azure-devops-extension-dev.json` with `-dev` id suffix and `[DEV]` name suffix (v0.2.0)
+  - Fixed trailing comma JSON syntax error in manifest contributions array
+  - Added `tfx-cli` (^0.23.1) as devDependency
+  - Added npm scripts: `compile`, `build`, `build:dev`, `package-extension`, `package-extension:dev`, `publish-extension`, `publish-extension:dev`
+  - Created `.github/workflows/publish.yml` — builds on PR/push to main, publishes dev extension on push to main using `ADO_PAT` secret
+  - Created `overview.md` (marketplace listing description)
+  - Created placeholder `logo.png` (1x1 pixel) — needs replacement with real logo before marketplace listing
+  - Deleted old `azure-devops-extensions-dev.json` (was just version/notes tracking, not a real manifest)
+  - Verified: `npm run build` compiles TypeScript, `tfx extension create` packages VSIX successfully
+  - Key learning: For decorator extensions (no webpack), the build chain is simply `tsc` + `tfx extension create`. The dev manifest needs its own extension id to avoid conflicting with production.
