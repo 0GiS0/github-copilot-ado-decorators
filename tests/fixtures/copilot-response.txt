@@ -1,0 +1,38 @@
+## Root Cause
+
+The pipeline failed because of an npm dependency resolution conflict (`ERESOLVE`). The package `some-package@1.0.0` requires `typescript >=4.2 <5.4` as a peer dependency, but the project has `typescript@5.4.0` installed.
+
+## Details
+
+The `npm install` step encountered an `ERESOLVE` error, which occurs when npm cannot find a version of a package that satisfies all peer dependency requirements in the dependency tree. Specifically:
+
+- The root project depends on `typescript@^5.0.0`, which resolved to `typescript@5.4.0`
+- The package `some-package@1.0.0` declares a peer dependency on `typescript@>=4.2 <5.4`
+- These two constraints are incompatible since `5.4.0` does not satisfy `<5.4`
+
+This is a common issue when upgrading TypeScript to a new minor version before all dependencies have updated their peer dependency ranges.
+
+## Suggested Fix
+
+1. **Option A — Downgrade TypeScript:** Change `typescript` in `package.json` to `"^5.3.0"` to stay within the compatible range:
+   ```json
+   "devDependencies": {
+     "typescript": "~5.3.3"
+   }
+   ```
+
+2. **Option B — Force resolution:** Add an `overrides` field in `package.json` to force the TypeScript version:
+   ```json
+   "overrides": {
+     "some-package": {
+       "typescript": "$typescript"
+     }
+   }
+   ```
+
+3. **Option C — Use `--legacy-peer-deps`:** Add `--legacy-peer-deps` flag to the npm install command as a temporary workaround.
+
+## Related Documentation
+
+- [npm ERESOLVE documentation](https://docs.npmjs.com/cli/v10/commands/npm-install#eresolve)
+- [TypeScript 5.4 Release Notes](https://devblogs.microsoft.com/typescript/announcing-typescript-5-4/)

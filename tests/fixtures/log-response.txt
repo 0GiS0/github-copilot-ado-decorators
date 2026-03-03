@@ -1,0 +1,21 @@
+2026-03-03T10:15:01.123Z ##[section]Starting: npm install
+2026-03-03T10:15:01.234Z ==============================================================================
+2026-03-03T10:15:01.345Z Task         : npm
+2026-03-03T10:15:01.456Z Description  : Install and publish npm packages
+2026-03-03T10:15:01.567Z Version      : 1.0.0
+2026-03-03T10:15:01.678Z ==============================================================================
+2026-03-03T10:15:02.100Z [command]/usr/local/bin/npm install
+2026-03-03T10:15:03.200Z npm warn deprecated @types/glob@7.2.0: This is a stub types definition
+2026-03-03T10:15:03.300Z npm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported
+2026-03-03T10:15:04.400Z npm ERR! code ERESOLVE
+2026-03-03T10:15:04.401Z npm ERR! ERESOLVE could not resolve
+2026-03-03T10:15:04.402Z npm ERR! 
+2026-03-03T10:15:04.403Z npm ERR! While resolving: @azure/abort-controller@2.1.2
+2026-03-03T10:15:04.404Z npm ERR! Found: typescript@5.4.0
+2026-03-03T10:15:04.405Z npm ERR! node_modules/typescript
+2026-03-03T10:15:04.406Z npm ERR!   dev typescript@"^5.0.0" from the root project
+2026-03-03T10:15:04.407Z npm ERR! 
+2026-03-03T10:15:04.408Z npm ERR! Could not resolve dependency:
+2026-03-03T10:15:04.409Z npm ERR! peer typescript@">=4.2 <5.4" from some-package@1.0.0
+2026-03-03T10:15:04.500Z ##[error]Error: Process completed with exit code 1.
+2026-03-03T10:15:04.600Z ##[section]Finishing: npm install
