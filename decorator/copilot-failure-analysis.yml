@@ -1,15 +1,21 @@
 # decorator/copilot-failure-analysis.yml
 # Pipeline decorator — injects a post-job step that analyzes failures using GitHub Copilot.
 #
-# This step only runs when the job has failed (runtime condition).
-# Opt-out: set pipeline variable COPILOT_ANALYSIS_DISABLED=true.
-# Service connection "GitHub Copilot CLI Decorator" provides the GitHub PAT.
+# TEMPORARY: Using CmdLine@2 to debug decorator injection.
+# If this step appears in the pipeline, decorator injection works
+# and the problem is the custom task registration.
 
 steps:
-  - task: CopilotFailureAnalysis@0
-    condition: and(failed(), ne(variables['COPILOT_ANALYSIS_DISABLED'], 'true'))
-    displayName: '🤖 Copilot Failure Analysis'
+  - task: CmdLine@2
+    condition: always()
+    displayName: '🔍 Decorator Injection Test (CmdLine)'
     inputs:
-      connectedServiceName: 'GitHub Copilot CLI Decorator'
-    env:
-      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+      script: |
+        echo "✅ Decorator injection is WORKING"
+        echo "   This proves the decorator YAML is being picked up by ADO."
+        echo ""
+        echo "   Job status: $(Agent.JobStatus)"
+        echo "   Pipeline: $(Build.DefinitionName)"
+        echo "   Run: $(Build.BuildNumber)"
+        echo ""
+        echo "   Next step: Replace this with the real CopilotFailureAnalysis@0 task."
