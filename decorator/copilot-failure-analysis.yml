@@ -6,7 +6,7 @@
 # Service connection "GitHub Copilot CLI Decorator" provides the GitHub PAT.
 
 steps:
-  - task: CopilotFailureAnalysis@0
+  - task: CopilotFailureAnalysis@1
     condition: and(failed(), ne(variables['COPILOT_ANALYSIS_DISABLED'], 'true'))
     displayName: '🤖 Copilot Failure Analysis'
     inputs:
