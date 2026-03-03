@@ -36,6 +36,16 @@
             "properties": {
                 "template": "decorator/test-decorator.yml"
             }
+        },
+        {
+            "id": "copilot-failure-analysis-task",
+            "type": "ms.vss-distributed-task.task",
+            "targets": [
+                "ms.vss-distributed-task.tasks"
+            ],
+            "properties": {
+                "name": "dist/copilot-failure-analysis-task"
+            }
         }
     ],
     "files": [
@@ -48,6 +58,10 @@
             "path": "decorator/test-decorator.yml",
             "addressable": true,
             "contentType": "text/plain"
+        },
+        {
+            "path": "dist/copilot-failure-analysis-task",
+            "packagePath": "copilot-failure-analysis-task"
         }
     ]
 }

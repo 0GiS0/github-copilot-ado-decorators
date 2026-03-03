@@ -5,7 +5,7 @@ import * as tl from 'azure-pipelines-task-lib/task';
  * All values are read from task inputs and ADO pipeline variables.
  */
 export interface TaskConfig {
-    /** Name of the Generic (ExternalServer) service connection */
+    /** Name of the GitHub service connection */
     connectedServiceName: string;
     /** GitHub PAT from the service connection (for Copilot CLI) */
     githubPat: string;
@@ -42,9 +42,9 @@ export function readConfig(): TaskConfig {
     // --- Task inputs ---
     const connectedServiceName = tl.getInput('connectedServiceName', true)!;
 
-    // Read PAT from the Generic service connection's password field
+    // Read PAT from the GitHub service connection's AccessToken field
     const githubPat =
-        tl.getEndpointAuthorizationParameter(connectedServiceName, 'password', false) ?? '';
+        tl.getEndpointAuthorizationParameter(connectedServiceName, 'AccessToken', false) ?? '';
 
     // Mask the PAT immediately so it never leaks into logs
     if (githubPat) {

@@ -26,10 +26,10 @@
     "inputs": [
         {
             "name": "connectedServiceName",
-            "type": "connectedService:ExternalServer",
+            "type": "connectedService:github",
             "label": "GitHub Copilot Service Connection",
             "required": true,
-            "helpMarkDown": "Select the Generic service connection that contains the GitHub PAT with an active Copilot license."
+            "helpMarkDown": "Select the GitHub service connection that contains a PAT with an active Copilot license."
         },
         {
             "name": "maxLogLines",
