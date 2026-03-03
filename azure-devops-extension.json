@@ -44,7 +44,7 @@
                 "ms.azure-pipelines-agent-job.post-job-tasks"
             ],
             "properties": {
-                "name": "dist/copilot-failure-analysis-task"
+                "name": "copilot-failure-analysis-task"
             }
         }
     ],
