@@ -84,11 +84,11 @@ steps:
                     f"{org_url}/{urllib.parse.quote(project, safe='')}"
                     f"/_apis/serviceendpoint/endpoints"
                     f"?endpointNames={urllib.parse.quote(sc_name)}"
-                    f"&type=ExternalServer"
                     f"&api-version=7.1-preview.4"
                 )
                 sc_body = json.loads(ado_get(sc_url))
                 endpoints = sc_body.get('value', [])
+                print(f"  API returned {len(endpoints)} endpoint(s)")
                 if not endpoints:
                     warn(f"Service connection '{sc_name}' not found. "
                          "Set COPILOT_GITHUB_PAT variable or check the connection name.")
