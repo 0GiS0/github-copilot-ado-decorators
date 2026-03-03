@@ -41,7 +41,7 @@
             "id": "copilot-failure-analysis-task",
             "type": "ms.azure-devops-server.build-release-task",
             "targets": [
-                "ms.azure-pipelines-agent-job.post-job-tasks"
+                "ms.azure-pipelines-agent-job"
             ],
             "properties": {
                 "name": "copilot-failure-analysis-task"
