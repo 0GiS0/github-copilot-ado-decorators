@@ -1,345 +1,364 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="utf-8">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Copilot Failure Analysis</title>
     <script src="lib/VSS.SDK.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/marked@15.0.7/marked.min.js"></script>
     <style>
+        :root {
+            --cp-purple: #8957e5;
+            --cp-purple-dark: #6e40c9;
+            --cp-purple-light: #c297ff;
+            --cp-bg: #f6f8fa;
+            --cp-surface: #ffffff;
+            --cp-text: #24292f;
+            --cp-text-muted: #656d76;
+            --cp-border: #d0d7de;
+            --cp-success: #1a7f37;
+            --cp-success-bg: #dafbe1;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
         body {
-            font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", Helvetica, Ubuntu, Arial, sans-serif;
-            margin: 0;
-            padding: 16px 24px;
-            color: var(--text-primary-color, #333);
-            background: var(--background-color, #fff);
-            line-height: 1.5;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+            background: var(--cp-bg);
+            color: var(--cp-text);
+            min-height: 100vh;
         }
 
-        #loading {
-            display: flex;
+        /* --- Screen containers --- */
+        .screen {
+            display: none;
+            flex-direction: column;
             align-items: center;
-            gap: 10px;
-            color: var(--text-secondary-color, #666);
-            padding: 32px 0;
+            justify-content: center;
+            min-height: 55vh;
+            padding: 48px 24px;
+            animation: fadeIn 0.35s ease;
+        }
+        .screen.active { display: flex; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to   { opacity: 1; transform: translateY(0); }
         }
 
+        /* --- Spinner --- */
         .spinner {
-            width: 20px;
-            height: 20px;
-            border: 2px solid var(--palette-neutral-20, #e0e0e0);
-            border-top-color: var(--palette-primary, #0078d4);
+            width: 44px; height: 44px;
+            border: 4px solid var(--cp-border);
+            border-top-color: var(--cp-purple);
             border-radius: 50%;
-            animation: spin 0.8s linear infinite;
+            animation: spin 0.75s linear infinite;
+            margin-bottom: 20px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .status-text { font-size: 15px; color: var(--cp-text-muted); }
+
+        /* --- All‑good --- */
+        .hero-emoji { font-size: 64px; margin-bottom: 20px; }
+        .allgood-title {
+            font-size: 26px; font-weight: 600;
+            color: var(--cp-success); margin-bottom: 10px;
+        }
+        .allgood-sub {
+            color: var(--cp-text-muted); font-size: 15px; margin-bottom: 20px;
+        }
+        .badge {
+            display: inline-flex; align-items: center; gap: 8px;
+            background: var(--cp-success-bg); color: var(--cp-success);
+            padding: 8px 18px; border-radius: 20px;
+            font-size: 14px; font-weight: 500;
         }
 
-        @keyframes spin {
-            to { transform: rotate(360deg); }
+        /* --- Running --- */
+        .running-title { font-size: 20px; font-weight: 600; margin-bottom: 8px; }
+        .running-sub   { font-size: 14px; color: var(--cp-text-muted); }
+
+        /* --- Analysis content --- */
+        #analysis { display: none; padding: 24px; animation: fadeIn 0.35s ease; }
+        #analysis.active { display: block; }
+
+        .analysis-header {
+            background: linear-gradient(135deg, var(--cp-purple), var(--cp-purple-dark));
+            color: #fff; padding: 22px 28px;
+            border-radius: 12px 12px 0 0;
+            display: flex; align-items: center; gap: 14px;
+        }
+        .analysis-header-icon { font-size: 30px; }
+        .analysis-header h1   { font-size: 19px; font-weight: 600; margin: 0; }
+        .analysis-header p    { font-size: 13px; opacity: 0.85; margin-top: 3px; }
+
+        .analysis-body {
+            background: var(--cp-surface);
+            border: 1px solid var(--cp-border);
+            border-top: none;
+            border-radius: 0 0 12px 12px;
+            padding: 28px 32px;
+            line-height: 1.65;
         }
 
-        #no-analysis {
-            display: none;
-            color: var(--text-secondary-color, #666);
-            padding: 32px 0;
-            text-align: center;
+        /* Markdown styles inside the analysis body */
+        .analysis-body h1 { display: none; }
+        .analysis-body h2 {
+            font-size: 19px; margin: 28px 0 10px;
+            padding-bottom: 6px; border-bottom: 1px solid var(--cp-border);
         }
-
-        #no-analysis .icon {
-            font-size: 48px;
-            margin-bottom: 12px;
+        .analysis-body h3 { font-size: 16px; margin: 22px 0 8px; }
+        .analysis-body p  { margin: 8px 0; }
+        .analysis-body ul,
+        .analysis-body ol { margin: 8px 0 8px 24px; }
+        .analysis-body li { margin: 4px 0; }
+        .analysis-body code {
+            background: #eff1f3; padding: 2px 6px;
+            border-radius: 4px; font-size: 13px;
         }
-
-        #content {
-            display: none;
-        }
-
-        /* Markdown rendered content styles */
-        #content h1 {
-            font-size: 20px;
-            font-weight: 600;
-            margin: 0 0 16px 0;
-            padding-bottom: 8px;
-            border-bottom: 1px solid var(--palette-neutral-20, #e0e0e0);
-        }
-
-        #content h2 {
-            font-size: 16px;
-            font-weight: 600;
-            margin: 20px 0 10px 0;
-        }
-
-        #content h3 {
-            font-size: 14px;
-            font-weight: 600;
-            margin: 16px 0 8px 0;
-        }
-
-        #content table {
-            border-collapse: collapse;
-            margin: 8px 0 16px 0;
+        .analysis-body pre {
+            background: #1e1e1e; color: #d4d4d4;
+            padding: 16px; border-radius: 8px;
+            overflow-x: auto; margin: 14px 0;
             font-size: 13px;
         }
-
-        #content th, #content td {
-            border: 1px solid var(--palette-neutral-20, #e0e0e0);
-            padding: 6px 12px;
-            text-align: left;
+        .analysis-body pre code {
+            background: none; padding: 0; color: inherit;
         }
-
-        #content th {
-            background: var(--palette-neutral-4, #f5f5f5);
-            font-weight: 600;
+        .analysis-body table { border-collapse: collapse; width: 100%; margin: 14px 0; }
+        .analysis-body th,
+        .analysis-body td { border: 1px solid var(--cp-border); padding: 8px 12px; text-align: left; }
+        .analysis-body th { background: var(--cp-bg); font-weight: 600; }
+        .analysis-body blockquote {
+            border-left: 4px solid var(--cp-purple-light);
+            padding: 10px 16px; margin: 14px 0;
+            background: #f3f0ff; border-radius: 0 8px 8px 0;
+            color: var(--cp-text-muted);
         }
+        .analysis-body hr { border: none; border-top: 1px solid var(--cp-border); margin: 24px 0; }
+        .analysis-body img { max-width: 100%; border-radius: 8px; }
 
-        #content pre {
-            background: var(--palette-neutral-4, #1e1e1e);
-            color: var(--palette-neutral-80, #d4d4d4);
-            border-radius: 4px;
-            padding: 12px 16px;
-            overflow-x: auto;
-            font-size: 13px;
-            line-height: 1.4;
-            margin: 8px 0;
-        }
-
-        #content code {
-            font-family: "Cascadia Code", Consolas, "Courier New", monospace;
-            font-size: 13px;
-        }
-
-        #content :not(pre) > code {
-            background: var(--palette-neutral-8, #f0f0f0);
-            padding: 2px 5px;
-            border-radius: 3px;
-            color: var(--text-primary-color, #333);
-        }
-
-        #content blockquote {
-            border-left: 3px solid var(--palette-neutral-20, #ccc);
-            margin: 12px 0;
-            padding: 4px 16px;
-            color: var(--text-secondary-color, #666);
-            font-size: 13px;
-        }
-
-        #content hr {
-            border: none;
-            border-top: 1px solid var(--palette-neutral-20, #e0e0e0);
-            margin: 20px 0;
-        }
-
-        #content ul, #content ol {
-            padding-left: 24px;
-            margin: 8px 0;
-        }
-
-        #content li {
-            margin: 4px 0;
-        }
-
-        #content p {
-            margin: 8px 0;
-        }
-
-        #content strong {
-            font-weight: 600;
-        }
-
-        #error {
-            display: none;
-            color: var(--status-error-color, #a80000);
-            padding: 16px;
-            background: var(--status-error-background, #fde7e9);
-            border-radius: 4px;
-            margin: 16px 0;
+        /* Error card */
+        .error-card {
+            background: #fff3cd; border: 1px solid #ffc107;
+            padding: 16px 20px; border-radius: 10px;
+            margin-top: 24px; text-align: center;
+            font-size: 14px; color: #664d03;
+            max-width: 480px;
         }
     </style>
 </head>
 <body>
-    <div id="loading">
+
+    <!-- 1) Loading -->
+    <div id="loading" class="screen active">
         <div class="spinner"></div>
-        <span>Loading Copilot analysis...</span>
+        <p class="status-text">Loading Copilot analysis…</p>
     </div>
 
-    <div id="content"></div>
-
-    <div id="no-analysis">
-        <div class="icon">🤖</div>
-        <p>No Copilot failure analysis available for this build.</p>
-        <p style="font-size: 13px;">The analysis is only generated when pipeline steps fail.</p>
+    <!-- 2) Build still running -->
+    <div id="running" class="screen">
+        <div class="hero-emoji">🤖</div>
+        <div class="running-title">Standing by…</div>
+        <p class="running-sub">The analysis will appear here once the build completes.</p>
     </div>
 
-    <div id="error"></div>
+    <!-- 3) All good (no failures) -->
+    <div id="allgood" class="screen">
+        <div class="hero-emoji">✨</div>
+        <div class="allgood-title">All good!</div>
+        <p class="allgood-sub">No failures detected in this pipeline run.</p>
+        <span class="badge">✅ All steps completed successfully</span>
+    </div>
+
+    <!-- 4) Analysis results -->
+    <div id="analysis">
+        <div class="analysis-header">
+            <span class="analysis-header-icon">🤖</span>
+            <div>
+                <h1>Copilot Failure Analysis</h1>
+                <p>AI-powered root cause analysis</p>
+            </div>
+        </div>
+        <div class="analysis-body" id="analysis-content"></div>
+    </div>
+
+    <!-- marked.js for Markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@15.0.7/marked.min.js"></script>
 
     <script>
-        // Our Copilot Failure Analysis task GUID (from task.json)
-        var TASK_GUID = "1eb0639b-4621-4a25-a38d-f66f162787b6";
-        var ATTACHMENT_TYPE = "copilot-analysis";
-        var ATTACHMENT_NAME = "report";
+        /* ---- constants ---- */
+        var TASK_GUID        = "1eb0639b-4621-4a25-a38d-f66f162787b6";
+        var ATTACHMENT_TYPE  = "copilot-analysis";
+        var ATTACHMENT_NAME  = "report";
+        var LOADING_TIMEOUT  = 15000;   // 15 s safety net
 
-        VSS.init({
-            explicitNotifyLoaded: true,
-            usePlatformStyles: true
-        });
-
-        VSS.ready(function () {
-            var config = VSS.getConfiguration();
-            if (config && config.onBuildChanged) {
-                config.onBuildChanged(function (build) {
-                    loadAnalysis(build);
-                });
-            } else {
-                showNoAnalysis();
+        /* ---- helpers ---- */
+        function showScreen(id) {
+            var all = document.querySelectorAll('.screen, #analysis');
+            for (var i = 0; i < all.length; i++) {
+                all[i].classList.remove('active');
+                if (!all[i].classList.contains('screen')) all[i].style.display = 'none';
             }
-            VSS.notifyLoadSucceeded();
-        });
-
-        function loadAnalysis(build) {
-            VSS.require(
-                ["VSS/Service", "TFS/Build/RestClient"],
-                function (Service, BuildRestClient) {
-                    var client = Service.getCollectionClient(BuildRestClient.BuildHttpClient);
-
-                    // Step 1: Get the timeline to find our task's record
-                    client.getBuildTimeline(build.project.id, build.id)
-                        .then(function (timeline) {
-                            if (!timeline || !timeline.records) {
-                                showNoAnalysis();
-                                return;
-                            }
-
-                            // Find completed CopilotFailureAnalysis task records
-                            var taskRecords = timeline.records.filter(function (r) {
-                                return r.task && r.task.id === TASK_GUID &&
-                                    r.state === "completed" &&
-                                    (r.result === "succeeded" || r.result === "succeededWithIssues");
-                            });
-
-                            if (taskRecords.length === 0) {
-                                showNoAnalysis();
-                                return;
-                            }
-
-                            // Step 2: Try to download the attachment from the first matching record
-                            var record = taskRecords[0];
-                            return client.getAttachment(
-                                build.project.id,
-                                build.id,
-                                timeline.id,
-                                record.id,
-                                ATTACHMENT_TYPE,
-                                ATTACHMENT_NAME
-                            );
-                        })
-                        .then(function (content) {
-                            if (content) {
-                                // content is an ArrayBuffer — decode to string
-                                var text = new TextDecoder("utf-8").decode(new Uint8Array(content));
-                                showContent(text);
-                            } else {
-                                showNoAnalysis();
-                            }
-                        })
-                        .catch(function (err) {
-                            console.error("[Copilot Analysis Tab] Error:", err);
-                            // Fallback: if getAttachment fails, try fetching all attachments via REST
-                            tryFallbackFetch(build);
-                        });
-                },
-                function (err) {
-                    console.error("[Copilot Analysis Tab] VSS.require error:", err);
-                    showNoAnalysis();
-                }
-            );
+            var el = document.getElementById(id);
+            if (!el) return;
+            el.classList.add('active');
+            if (id === 'analysis') el.style.display = 'block';
         }
 
-        function tryFallbackFetch(build) {
-            // Fallback approach: use REST API directly with auth token
-            VSS.require(["VSS/Authentication/Services"], function (AuthServices) {
-                var webContext = VSS.getWebContext();
-                var baseUrl = webContext.collection.uri;
-                var url = baseUrl + encodeURIComponent(build.project.name) +
-                    "/_apis/build/builds/" + build.id +
-                    "/attachments/" + ATTACHMENT_TYPE + "?api-version=7.1";
+        function renderMarkdown(md) {
+            try {
+                return marked.parse(md);
+            } catch (_) {
+                return '<pre>' + md.replace(/</g, '&lt;') + '</pre>';
+            }
+        }
 
-                VSS.getAccessToken().then(function (token) {
-                    var authHeader = "Bearer " + token.token;
+        function isBuildCompleted(b) {
+            return b.status === 2 ||
+                (typeof b.status === 'string' && b.status.toLowerCase() === 'completed');
+        }
 
-                    fetch(url, {
-                        headers: { "Authorization": authHeader, "Accept": "application/json" }
-                    })
-                        .then(function (r) { return r.json(); })
-                        .then(function (data) {
-                            if (data.value && data.value.length > 0) {
-                                var downloadUrl = data.value[0]._links.self.href;
-                                return fetch(downloadUrl, {
-                                    headers: { "Authorization": authHeader }
-                                });
-                            }
-                            return null;
-                        })
-                        .then(function (r) { return r ? r.text() : null; })
-                        .then(function (markdown) {
-                            if (markdown) {
-                                showContent(markdown);
-                            } else {
-                                showNoAnalysis();
-                            }
-                        })
-                        .catch(function () {
-                            showNoAnalysis();
-                        });
+        function isBuildSucceeded(b) {
+            return b.result === 2 ||
+                (typeof b.result === 'string' && b.result.toLowerCase() === 'succeeded');
+        }
+
+        /* ---- attachment download (SDK method + REST fallback) ---- */
+        function downloadAttachment(client, projectId, buildId,
+                                    timelineId, recordId, AuthServices) {
+            /* Try the SDK getAttachment first (returns ArrayBuffer) */
+            if (typeof client.getAttachment === 'function') {
+                return client.getAttachment(
+                    projectId, buildId, timelineId, recordId,
+                    ATTACHMENT_TYPE, ATTACHMENT_NAME
+                ).then(function (buf) {
+                    return new TextDecoder('utf-8').decode(new Uint8Array(buf));
                 });
+            }
+
+            /* Fallback: raw REST with auth token */
+            return new Promise(function (resolve, reject) {
+                VSS.getAccessToken().then(function (token) {
+                    var header = AuthServices.authTokenManager
+                                    .getAuthorizationHeader(token);
+                    var uri = VSS.getWebContext().collection.uri;
+                    if (!uri.endsWith('/')) uri += '/';
+                    var url = uri + projectId +
+                              '/_apis/build/builds/' + buildId +
+                              '/attachments/' + ATTACHMENT_TYPE +
+                              '/' + ATTACHMENT_NAME +
+                              '?api-version=7.0';
+
+                    fetch(url, { headers: { 'Authorization': header } })
+                        .then(function (r) {
+                            if (!r.ok) throw new Error('HTTP ' + r.status);
+                            return r.text();
+                        })
+                        .then(resolve)
+                        .catch(reject);
+                }).catch(reject);
             });
         }
 
-        function showContent(markdown) {
-            document.getElementById("loading").style.display = "none";
+        /* ---- main logic ---- */
+        var loadingTimer = setTimeout(function () {
+            showScreen('allgood');
+        }, LOADING_TIMEOUT);
 
-            // Render markdown to HTML using marked.js
-            var html;
-            if (typeof marked !== "undefined" && marked.parse) {
-                html = marked.parse(markdown);
-            } else {
-                // Fallback: basic conversion if marked.js failed to load
-                html = basicMarkdownToHtml(markdown);
+        VSS.init({ usePlatformScripts: true, usePlatformStyles: true });
+
+        VSS.ready(function () {
+            try {
+                var cfg = VSS.getConfiguration();
+                if (!cfg || typeof cfg.onBuildChanged !== 'function') {
+                    clearTimeout(loadingTimer);
+                    showScreen('allgood');
+                    return;
+                }
+
+                cfg.onBuildChanged(function (build) {
+                    clearTimeout(loadingTimer);
+
+                    if (!build) { showScreen('allgood'); return; }
+
+                    /* Build still running? */
+                    if (!isBuildCompleted(build)) {
+                        showScreen('running');
+                        return;
+                    }
+
+                    /* Build succeeded → task never ran (decorator condition: failed()) */
+                    if (isBuildSucceeded(build)) {
+                        showScreen('allgood');
+                        return;
+                    }
+
+                    /* Build failed / partially succeeded → look for analysis */
+                    try {
+                        VSS.require(
+                            ['TFS/Build/RestClient', 'VSS/Authentication/Services'],
+                            function (BuildRestClient, AuthServices) {
+                                try {
+                                    var client    = BuildRestClient.getClient();
+                                    var projectId = VSS.getWebContext().project.id;
+                                    fetchAnalysis(client, projectId, build.id, AuthServices);
+                                } catch (_) { showScreen('allgood'); }
+                            }
+                        );
+                    } catch (_) { showScreen('allgood'); }
+                });
+            } catch (_) {
+                clearTimeout(loadingTimer);
+                showScreen('allgood');
             }
+        });
 
-            var el = document.getElementById("content");
-            el.innerHTML = html;
-            el.style.display = "block";
-        }
+        function fetchAnalysis(client, projectId, buildId, AuthServices) {
+            client.getBuildTimeline(projectId, buildId)
+                .then(function (timeline) {
+                    if (!timeline || !timeline.records) {
+                        showScreen('allgood');
+                        return;
+                    }
 
-        function showNoAnalysis() {
-            document.getElementById("loading").style.display = "none";
-            document.getElementById("no-analysis").style.display = "block";
-        }
+                    /* Find completed CopilotFailureAnalysis record */
+                    var rec = null;
+                    for (var i = 0; i < timeline.records.length; i++) {
+                        var r = timeline.records[i];
+                        if (r.task && r.task.id &&
+                            r.task.id.toLowerCase() === TASK_GUID &&
+                            r.state &&
+                            r.state.toLowerCase() === 'completed') {
+                            rec = r;
+                            break;
+                        }
+                    }
 
-        function showError(message) {
-            document.getElementById("loading").style.display = "none";
-            var el = document.getElementById("error");
-            el.textContent = "Error: " + message;
-            el.style.display = "block";
-        }
+                    if (!rec) {
+                        showScreen('allgood');
+                        return;
+                    }
 
-        /**
-         * Basic markdown-to-HTML fallback in case marked.js doesn't load.
-         */
-        function basicMarkdownToHtml(md) {
-            return md
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;")
-                .replace(/```[\w]*\n([\s\S]*?)```/g, "<pre><code>$1</code></pre>")
-                .replace(/^### (.+)$/gm, "<h3>$1</h3>")
-                .replace(/^## (.+)$/gm, "<h2>$1</h2>")
-                .replace(/^# (.+)$/gm, "<h1>$1</h1>")
-                .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-                .replace(/`([^`]+)`/g, "<code>$1</code>")
-                .replace(/^[-*] (.+)$/gm, "<li>$1</li>")
-                .replace(/^---+$/gm, "<hr>")
-                .replace(/^&gt; (.+)$/gm, "<blockquote>$1</blockquote>")
-                .replace(/\n\n/g, "</p><p>")
-                .replace(/\n/g, "<br>");
+                    /* Download the attachment */
+                    downloadAttachment(
+                        client, projectId, buildId,
+                        timeline.id, rec.id, AuthServices
+                    ).then(function (md) {
+                        if (md) {
+                            document.getElementById('analysis-content')
+                                .innerHTML = renderMarkdown(md);
+                            showScreen('analysis');
+                        } else {
+                            showScreen('allgood');
+                        }
+                    }).catch(function () {
+                        showScreen('allgood');
+                    });
+                })
+                .catch(function () {
+                    showScreen('allgood');
+                });
         }
     </script>
 </body>
