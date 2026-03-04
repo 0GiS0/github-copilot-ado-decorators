@@ -81,35 +81,34 @@ export async function getFailedStepLogs(config: TaskConfig): Promise<FailedStepL
         const timelineUrl =
             `${baseUrl}/${encodeURIComponent(config.project)}/_apis/build/builds/${config.buildId}/timeline?api-version=7.1`;
 
-        tl.debug(`Fetching timeline: ${timelineUrl}`);
+        console.log(`[Copilot Analysis] Fetching timeline: ${timelineUrl}`);
         const timelineBody = await httpsGet(timelineUrl, config.adoToken);
         const timeline = JSON.parse(timelineBody);
 
         if (!timeline.records || !Array.isArray(timeline.records)) {
-            tl.debug('No timeline records found');
+            console.log('[Copilot Analysis] No timeline records found in API response');
             return [];
         }
 
-        // Log summary of all records for diagnostics
-        const recordSummary = timeline.records.map(
-            (r: { name: string; type: string; result: string }) =>
-                `${r.name} [type=${r.type}, result=${r.result}]`,
-        );
-        tl.debug(`Timeline has ${timeline.records.length} records: ${recordSummary.join('; ')}`);
+        // Log summary of all records for diagnostics (always visible, not behind system.debug)
+        console.log(`[Copilot Analysis] Timeline has ${timeline.records.length} records:`);
+        for (const r of timeline.records) {
+            console.log(`  - ${r.name} [type=${r.type}, state=${r.state}, result=${r.result}]`);
+        }
 
         // 2. Filter for failed Task records (case-insensitive comparison
-        //    because the ADO API may return "failed" or "Failed")
+        //    because the ADO API may return different casing)
         const failedTasks = timeline.records.filter(
             (r: { result: string; type: string }) =>
-                r.result?.toLowerCase() === 'failed' && r.type === 'Task',
+                r.result?.toLowerCase() === 'failed' && r.type?.toLowerCase() === 'task',
         );
 
         if (failedTasks.length === 0) {
-            tl.debug('No failed task records in timeline');
+            console.log('[Copilot Analysis] No failed task records in timeline');
             return [];
         }
 
-        tl.debug(`Found ${failedTasks.length} failed task(s)`);
+        console.log(`[Copilot Analysis] Found ${failedTasks.length} failed task(s)`);
 
         // 3. Fetch logs for each failed task
         for (const task of failedTasks) {
@@ -132,7 +131,7 @@ export async function getFailedStepLogs(config: TaskConfig): Promise<FailedStepL
                     const logUrl =
                         `${baseUrl}/${encodeURIComponent(config.project)}/_apis/build/builds/${config.buildId}/logs/${task.log.id}?api-version=7.1`;
 
-                    tl.debug(`Fetching log ${task.log.id} for step "${stepName}"`);
+                    console.log(`[Copilot Analysis] Fetching log ${task.log.id} for step "${stepName}"`);
                     const rawLog = await httpsGet(logUrl, config.adoToken);
 
                     // Truncate to last N lines — errors are typically at the end
