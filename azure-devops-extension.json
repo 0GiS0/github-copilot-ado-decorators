@@ -44,7 +44,7 @@
                 "ms.vss-distributed-task.tasks"
             ],
             "properties": {
-                "name": "dist/copilot-failure-analysis-task"
+                "name": "copilot-failure-analysis-task"
             }
         }
     ],
