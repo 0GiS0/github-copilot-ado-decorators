@@ -9,7 +9,7 @@
     "targets": [
         { "id": "Microsoft.VisualStudio.Services" }
     ],
-    "scopes": [],
+    "scopes": ["vso.build"],
     "icons": {
         "default": "logo.png"
     },
@@ -46,6 +46,20 @@
             "properties": {
                 "name": "copilot-failure-analysis-task"
             }
+        },
+        {
+            "id": "copilot-failure-analysis-tab",
+            "type": "ms.vss-build-web.build-results-tab",
+            "description": "Shows Copilot failure analysis results in a dedicated tab",
+            "targets": [
+                "ms.vss-build-web.build-results-view"
+            ],
+            "properties": {
+                "name": "Copilot Failure Analysis",
+                "uri": "copilot-analysis-tab/tab.html",
+                "supportsMobile": false,
+                "order": 100
+            }
         }
     ],
     "files": [
@@ -62,6 +76,10 @@
         {
             "path": "dist/copilot-failure-analysis-task",
             "packagePath": "copilot-failure-analysis-task"
+        },
+        {
+            "path": "copilot-analysis-tab",
+            "addressable": true
         }
     ]
 }

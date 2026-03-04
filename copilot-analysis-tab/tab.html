@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Copilot Failure Analysis</title>
+    <script src="lib/VSS.SDK.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked@15.0.7/marked.min.js"></script>
+    <style>
+        body {
+            font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", Helvetica, Ubuntu, Arial, sans-serif;
+            margin: 0;
+            padding: 16px 24px;
+            color: var(--text-primary-color, #333);
+            background: var(--background-color, #fff);
+            line-height: 1.5;
+        }
+
+        #loading {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--text-secondary-color, #666);
+            padding: 32px 0;
+        }
+
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--palette-neutral-20, #e0e0e0);
+            border-top-color: var(--palette-primary, #0078d4);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        #no-analysis {
+            display: none;
+            color: var(--text-secondary-color, #666);
+            padding: 32px 0;
+            text-align: center;
+        }
+
+        #no-analysis .icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+
+        #content {
+            display: none;
+        }
+
+        /* Markdown rendered content styles */
+        #content h1 {
+            font-size: 20px;
+            font-weight: 600;
+            margin: 0 0 16px 0;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--palette-neutral-20, #e0e0e0);
+        }
+
+        #content h2 {
+            font-size: 16px;
+            font-weight: 600;
+            margin: 20px 0 10px 0;
+        }
+
+        #content h3 {
+            font-size: 14px;
+            font-weight: 600;
+            margin: 16px 0 8px 0;
+        }
+
+        #content table {
+            border-collapse: collapse;
+            margin: 8px 0 16px 0;
+            font-size: 13px;
+        }
+
+        #content th, #content td {
+            border: 1px solid var(--palette-neutral-20, #e0e0e0);
+            padding: 6px 12px;
+            text-align: left;
+        }
+
+        #content th {
+            background: var(--palette-neutral-4, #f5f5f5);
+            font-weight: 600;
+        }
+
+        #content pre {
+            background: var(--palette-neutral-4, #1e1e1e);
+            color: var(--palette-neutral-80, #d4d4d4);
+            border-radius: 4px;
+            padding: 12px 16px;
+            overflow-x: auto;
+            font-size: 13px;
+            line-height: 1.4;
+            margin: 8px 0;
+        }
+
+        #content code {
+            font-family: "Cascadia Code", Consolas, "Courier New", monospace;
+            font-size: 13px;
+        }
+
+        #content :not(pre) > code {
+            background: var(--palette-neutral-8, #f0f0f0);
+            padding: 2px 5px;
+            border-radius: 3px;
+            color: var(--text-primary-color, #333);
+        }
+
+        #content blockquote {
+            border-left: 3px solid var(--palette-neutral-20, #ccc);
+            margin: 12px 0;
+            padding: 4px 16px;
+            color: var(--text-secondary-color, #666);
+            font-size: 13px;
+        }
+
+        #content hr {
+            border: none;
+            border-top: 1px solid var(--palette-neutral-20, #e0e0e0);
+            margin: 20px 0;
+        }
+
+        #content ul, #content ol {
+            padding-left: 24px;
+            margin: 8px 0;
+        }
+
+        #content li {
+            margin: 4px 0;
+        }
+
+        #content p {
+            margin: 8px 0;
+        }
+
+        #content strong {
+            font-weight: 600;
+        }
+
+        #error {
+            display: none;
+            color: var(--status-error-color, #a80000);
+            padding: 16px;
+            background: var(--status-error-background, #fde7e9);
+            border-radius: 4px;
+            margin: 16px 0;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">
+        <div class="spinner"></div>
+        <span>Loading Copilot analysis...</span>
+    </div>
+
+    <div id="content"></div>
+
+    <div id="no-analysis">
+        <div class="icon">🤖</div>
+        <p>No Copilot failure analysis available for this build.</p>
+        <p style="font-size: 13px;">The analysis is only generated when pipeline steps fail.</p>
+    </div>
+
+    <div id="error"></div>
+
+    <script>
+        // Our Copilot Failure Analysis task GUID (from task.json)
+        var TASK_GUID = "1eb0639b-4621-4a25-a38d-f66f162787b6";
+        var ATTACHMENT_TYPE = "copilot-analysis";
+        var ATTACHMENT_NAME = "report";
+
+        VSS.init({
+            explicitNotifyLoaded: true,
+            usePlatformStyles: true
+        });
+
+        VSS.ready(function () {
+            var config = VSS.getConfiguration();
+            if (config && config.onBuildChanged) {
+                config.onBuildChanged(function (build) {
+                    loadAnalysis(build);
+                });
+            } else {
+                showNoAnalysis();
+            }
+            VSS.notifyLoadSucceeded();
+        });
+
+        function loadAnalysis(build) {
+            VSS.require(
+                ["VSS/Service", "TFS/Build/RestClient"],
+                function (Service, BuildRestClient) {
+                    var client = Service.getCollectionClient(BuildRestClient.BuildHttpClient);
+
+                    // Step 1: Get the timeline to find our task's record
+                    client.getBuildTimeline(build.project.id, build.id)
+                        .then(function (timeline) {
+                            if (!timeline || !timeline.records) {
+                                showNoAnalysis();
+                                return;
+                            }
+
+                            // Find completed CopilotFailureAnalysis task records
+                            var taskRecords = timeline.records.filter(function (r) {
+                                return r.task && r.task.id === TASK_GUID &&
+                                    r.state === "completed" &&
+                                    (r.result === "succeeded" || r.result === "succeededWithIssues");
+                            });
+
+                            if (taskRecords.length === 0) {
+                                showNoAnalysis();
+                                return;
+                            }
+
+                            // Step 2: Try to download the attachment from the first matching record
+                            var record = taskRecords[0];
+                            return client.getAttachment(
+                                build.project.id,
+                                build.id,
+                                timeline.id,
+                                record.id,
+                                ATTACHMENT_TYPE,
+                                ATTACHMENT_NAME
+                            );
+                        })
+                        .then(function (content) {
+                            if (content) {
+                                // content is an ArrayBuffer — decode to string
+                                var text = new TextDecoder("utf-8").decode(new Uint8Array(content));
+                                showContent(text);
+                            } else {
+                                showNoAnalysis();
+                            }
+                        })
+                        .catch(function (err) {
+                            console.error("[Copilot Analysis Tab] Error:", err);
+                            // Fallback: if getAttachment fails, try fetching all attachments via REST
+                            tryFallbackFetch(build);
+                        });
+                },
+                function (err) {
+                    console.error("[Copilot Analysis Tab] VSS.require error:", err);
+                    showNoAnalysis();
+                }
+            );
+        }
+
+        function tryFallbackFetch(build) {
+            // Fallback approach: use REST API directly with auth token
+            VSS.require(["VSS/Authentication/Services"], function (AuthServices) {
+                var webContext = VSS.getWebContext();
+                var baseUrl = webContext.collection.uri;
+                var url = baseUrl + encodeURIComponent(build.project.name) +
+                    "/_apis/build/builds/" + build.id +
+                    "/attachments/" + ATTACHMENT_TYPE + "?api-version=7.1";
+
+                VSS.getAccessToken().then(function (token) {
+                    var authHeader = "Bearer " + token.token;
+
+                    fetch(url, {
+                        headers: { "Authorization": authHeader, "Accept": "application/json" }
+                    })
+                        .then(function (r) { return r.json(); })
+                        .then(function (data) {
+                            if (data.value && data.value.length > 0) {
+                                var downloadUrl = data.value[0]._links.self.href;
+                                return fetch(downloadUrl, {
+                                    headers: { "Authorization": authHeader }
+                                });
+                            }
+                            return null;
+                        })
+                        .then(function (r) { return r ? r.text() : null; })
+                        .then(function (markdown) {
+                            if (markdown) {
+                                showContent(markdown);
+                            } else {
+                                showNoAnalysis();
+                            }
+                        })
+                        .catch(function () {
+                            showNoAnalysis();
+                        });
+                });
+            });
+        }
+
+        function showContent(markdown) {
+            document.getElementById("loading").style.display = "none";
+
+            // Render markdown to HTML using marked.js
+            var html;
+            if (typeof marked !== "undefined" && marked.parse) {
+                html = marked.parse(markdown);
+            } else {
+                // Fallback: basic conversion if marked.js failed to load
+                html = basicMarkdownToHtml(markdown);
+            }
+
+            var el = document.getElementById("content");
+            el.innerHTML = html;
+            el.style.display = "block";
+        }
+
+        function showNoAnalysis() {
+            document.getElementById("loading").style.display = "none";
+            document.getElementById("no-analysis").style.display = "block";
+        }
+
+        function showError(message) {
+            document.getElementById("loading").style.display = "none";
+            var el = document.getElementById("error");
+            el.textContent = "Error: " + message;
+            el.style.display = "block";
+        }
+
+        /**
+         * Basic markdown-to-HTML fallback in case marked.js doesn't load.
+         */
+        function basicMarkdownToHtml(md) {
+            return md
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/```[\w]*\n([\s\S]*?)```/g, "<pre><code>$1</code></pre>")
+                .replace(/^### (.+)$/gm, "<h3>$1</h3>")
+                .replace(/^## (.+)$/gm, "<h2>$1</h2>")
+                .replace(/^# (.+)$/gm, "<h1>$1</h1>")
+                .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+                .replace(/`([^`]+)`/g, "<code>$1</code>")
+                .replace(/^[-*] (.+)$/gm, "<li>$1</li>")
+                .replace(/^---+$/gm, "<hr>")
+                .replace(/^&gt; (.+)$/gm, "<blockquote>$1</blockquote>")
+                .replace(/\n\n/g, "</p><p>")
+                .replace(/\n/g, "<br>");
+        }
+    </script>
+</body>
+</html>

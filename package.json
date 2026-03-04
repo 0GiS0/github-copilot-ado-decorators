@@ -7,7 +7,7 @@
   "private": true,
   "scripts": {
     "compile": "tsc",
-    "postcompile": "cp src/copilot-failure-analysis-task/task.json dist/copilot-failure-analysis-task/ && node -e \"require('fs').writeFileSync('dist/copilot-failure-analysis-task/package.json', JSON.stringify({dependencies:{'azure-pipelines-task-lib':'^4.0.0'}}))\" && npm install --production --prefix dist/copilot-failure-analysis-task",
+    "postcompile": "cp src/copilot-failure-analysis-task/task.json dist/copilot-failure-analysis-task/ && node -e \"require('fs').writeFileSync('dist/copilot-failure-analysis-task/package.json', JSON.stringify({dependencies:{'azure-pipelines-task-lib':'^4.0.0'}}))\" && npm install --production --prefix dist/copilot-failure-analysis-task && mkdir -p copilot-analysis-tab/lib && cp node_modules/vss-web-extension-sdk/lib/VSS.SDK.min.js copilot-analysis-tab/lib/",
     "build": "npm run compile",
     "build:dev": "npm run compile && npm run package-extension:dev",
     "package-extension": "tfx extension create --manifest-globs azure-devops-extension.json",
@@ -26,6 +26,7 @@
     "jest": "^29.0.0",
     "tfx-cli": "^0.23.1",
     "ts-jest": "^29.0.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "vss-web-extension-sdk": "^5.141.0"
   }
 }

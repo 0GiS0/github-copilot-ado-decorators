@@ -3,3 +3,4 @@ dist/
 *.vsix
 .env
 *.js.map
+copilot-analysis-tab/lib/

@@ -89,6 +89,9 @@ export async function formatAndDisplay(
 
         // Attach as Pipeline Run Summary (appears in Extensions tab)
         console.log(`##vso[task.uploadsummary]${filePath}`);
+
+        // Also upload as attachment for the custom "Copilot Failure Analysis" build results tab
+        console.log(`##vso[task.addattachment type=copilot-analysis;name=report]${filePath}`);
     } catch (writeError: unknown) {
         const msg = writeError instanceof Error ? writeError.message : String(writeError);
         tl.warning(`Failed to write analysis report: ${msg}`);
