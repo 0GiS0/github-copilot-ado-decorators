@@ -90,10 +90,18 @@ export async function getFailedStepLogs(config: TaskConfig): Promise<FailedStepL
             return [];
         }
 
-        // 2. Filter for failed Task records
+        // Log summary of all records for diagnostics
+        const recordSummary = timeline.records.map(
+            (r: { name: string; type: string; result: string }) =>
+                `${r.name} [type=${r.type}, result=${r.result}]`,
+        );
+        tl.debug(`Timeline has ${timeline.records.length} records: ${recordSummary.join('; ')}`);
+
+        // 2. Filter for failed Task records (case-insensitive comparison
+        //    because the ADO API may return "failed" or "Failed")
         const failedTasks = timeline.records.filter(
             (r: { result: string; type: string }) =>
-                r.result === 'failed' && r.type === 'Task',
+                r.result?.toLowerCase() === 'failed' && r.type === 'Task',
         );
 
         if (failedTasks.length === 0) {
