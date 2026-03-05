@@ -171,6 +171,14 @@
         <span class="badge">✅ All steps completed successfully</span>
     </div>
 
+    <!-- 5) Error / debug info -->
+    <div id="error" class="screen">
+        <div class="hero-emoji">⚠️</div>
+        <div class="running-title">Could not load analysis</div>
+        <p class="running-sub" id="error-detail" style="margin-top:8px;max-width:600px;word-break:break-all;"></p>
+        <div class="error-card" id="error-log" style="text-align:left;font-family:monospace;font-size:12px;white-space:pre-wrap;max-height:200px;overflow:auto;margin-top:16px;max-width:700px;"></div>
+    </div>
+
     <!-- 4) Analysis results -->
     <div id="analysis">
         <div class="analysis-header">
@@ -191,11 +199,17 @@
         var TASK_GUID        = "1eb0639b-4621-4a25-a38d-f66f162787b6";
         var ATTACHMENT_TYPE  = "copilot-analysis";
         var ATTACHMENT_NAME  = "report";
-        var LOADING_TIMEOUT  = 20000;   // 20 s safety net
+        var LOADING_TIMEOUT  = 25000;
+
+        /* ---- debug log buffer ---- */
+        var _logs = [];
+        function log(msg) {
+            var line = new Date().toISOString().substr(11, 12) + ' ' + msg;
+            _logs.push(line);
+            console.log('[CopilotTab] ' + msg);
+        }
 
         /* ---- helpers ---- */
-        function log(msg) { console.log('[CopilotTab] ' + msg); }
-
         function showScreen(id) {
             log('showScreen → ' + id);
             var all = document.querySelectorAll('.screen, #analysis');
@@ -209,154 +223,34 @@
             if (id === 'analysis') el.style.display = 'block';
         }
 
+        function showError(msg) {
+            log('ERROR: ' + msg);
+            document.getElementById('error-detail').textContent = msg;
+            document.getElementById('error-log').textContent = _logs.join('\n');
+            showScreen('error');
+        }
+
         function renderMarkdown(md) {
-            try {
-                return marked.parse(md);
-            } catch (_) {
-                return '<pre>' + md.replace(/</g, '&lt;') + '</pre>';
-            }
+            try { return marked.parse(md); }
+            catch (_) { return '<pre>' + md.replace(/</g, '&lt;') + '</pre>'; }
         }
 
-        /* Enum-safe comparisons: ADO may send numbers OR strings */
-        function isStateCompleted(state) {
-            if (state === 2 || state === 'completed') return true;
-            if (typeof state === 'string') return state.toLowerCase() === 'completed';
-            return false;
-        }
-
+        /* Enum-safe: ADO sends numbers or strings depending on SDK version */
         function isBuildCompleted(b) {
-            /* BuildStatus.Completed = 2 */
-            if (b.status === 2 || b.status === 'completed') return true;
-            if (typeof b.status === 'string') return b.status.toLowerCase() === 'completed';
-            return false;
+            var s = b.status;
+            return s === 2 || s === 'completed' ||
+                (typeof s === 'string' && s.toLowerCase() === 'completed');
         }
 
         function isBuildSucceeded(b) {
-            /* BuildResult.Succeeded = 2 */
-            if (b.result === 2 || b.result === 'succeeded') return true;
-            if (typeof b.result === 'string') return b.result.toLowerCase() === 'succeeded';
-            return false;
-        }
-
-        /* ---- fetch attachment via REST (build-level, no timeline needed) ---- */
-        function fetchAttachmentREST(projectId, buildId) {
-            log('fetchAttachmentREST: trying build-level REST API');
-            return new Promise(function (resolve, reject) {
-                VSS.getAccessToken().then(function (token) {
-                    VSS.require(['VSS/Authentication/Services'], function (AuthServices) {
-                        try {
-                            var header = AuthServices.authTokenManager
-                                            .getAuthorizationHeader(token);
-                            var uri = VSS.getWebContext().collection.uri;
-                            if (!uri.endsWith('/')) uri += '/';
-
-                            /* List all attachments of our type */
-                            var listUrl = uri + projectId +
-                                '/_apis/build/builds/' + buildId +
-                                '/attachments/' + ATTACHMENT_TYPE +
-                                '?api-version=7.0';
-
-                            log('REST list URL: ' + listUrl);
-
-                            fetch(listUrl, { headers: { 'Authorization': header } })
-                                .then(function (r) {
-                                    log('REST list response: ' + r.status);
-                                    if (!r.ok) throw new Error('HTTP ' + r.status);
-                                    return r.json();
-                                })
-                                .then(function (data) {
-                                    var attachments = data.value || data;
-                                    log('Attachments found: ' + (attachments ? attachments.length : 0));
-
-                                    if (!attachments || attachments.length === 0) {
-                                        reject(new Error('No attachments found'));
-                                        return;
-                                    }
-
-                                    /* Find our attachment by name */
-                                    var att = null;
-                                    for (var i = 0; i < attachments.length; i++) {
-                                        if (attachments[i].name === ATTACHMENT_NAME) {
-                                            att = attachments[i];
-                                            break;
-                                        }
-                                    }
-                                    if (!att) {
-                                        /* Just use the first one */
-                                        att = attachments[0];
-                                    }
-
-                                    /* Download via _links or construct URL */
-                                    var dlUrl = (att._links && att._links.self && att._links.self.href)
-                                        ? att._links.self.href
-                                        : uri + projectId + '/_apis/build/builds/' + buildId +
-                                          '/attachments/' + ATTACHMENT_TYPE + '/' +
-                                          encodeURIComponent(att.name) + '?api-version=7.0';
-
-                                    log('Downloading attachment from: ' + dlUrl);
-
-                                    fetch(dlUrl, { headers: { 'Authorization': header } })
-                                        .then(function (r2) {
-                                            log('Download response: ' + r2.status);
-                                            if (!r2.ok) throw new Error('HTTP ' + r2.status);
-                                            return r2.text();
-                                        })
-                                        .then(resolve)
-                                        .catch(reject);
-                                })
-                                .catch(reject);
-                        } catch (e) { reject(e); }
-                    });
-                }).catch(reject);
-            });
-        }
-
-        /* ---- fetch via SDK getAttachment (needs timeline record) ---- */
-        function fetchAttachmentSDK(client, projectId, buildId) {
-            log('fetchAttachmentSDK: trying SDK getAttachment via timeline');
-            return client.getBuildTimeline(projectId, buildId)
-                .then(function (timeline) {
-                    if (!timeline || !timeline.records) {
-                        throw new Error('No timeline records');
-                    }
-                    log('Timeline records: ' + timeline.records.length);
-
-                    /* Find completed CopilotFailureAnalysis record */
-                    var rec = null;
-                    for (var i = 0; i < timeline.records.length; i++) {
-                        var r = timeline.records[i];
-                        if (r.task && r.task.id &&
-                            r.task.id.toLowerCase() === TASK_GUID) {
-                            log('Found task record: state=' + r.state +
-                                ' (type=' + typeof r.state + ')' +
-                                ', result=' + r.result +
-                                ', id=' + r.id);
-                            if (isStateCompleted(r.state)) {
-                                rec = r;
-                                break;
-                            }
-                        }
-                    }
-
-                    if (!rec) {
-                        throw new Error('Task record not found or not completed');
-                    }
-
-                    log('Using record ' + rec.id + ' from timeline ' + timeline.id);
-
-                    return client.getAttachment(
-                        projectId, buildId, timeline.id, rec.id,
-                        ATTACHMENT_TYPE, ATTACHMENT_NAME
-                    ).then(function (buf) {
-                        return new TextDecoder('utf-8').decode(new Uint8Array(buf));
-                    });
-                });
+            var r = b.result;
+            return r === 2 || r === 'succeeded' ||
+                (typeof r === 'string' && r.toLowerCase() === 'succeeded');
         }
 
         /* ---- main logic ---- */
         var loadingTimer = setTimeout(function () {
-            log('TIMEOUT: 20s reached, showing allgood');
-            showScreen('allgood');
+            showError('Timeout reached (' + LOADING_TIMEOUT + 'ms). The analysis could not be loaded.');
         }, LOADING_TIMEOUT);
 
         VSS.init({ usePlatformScripts: true, usePlatformStyles: true });
@@ -365,7 +259,7 @@
             log('VSS.ready fired');
             try {
                 var cfg = VSS.getConfiguration();
-                log('Configuration: ' + (cfg ? 'OK' : 'null') +
+                log('cfg: ' + (cfg ? 'OK' : 'null') +
                     ', onBuildChanged: ' + (cfg && typeof cfg.onBuildChanged));
 
                 if (!cfg || typeof cfg.onBuildChanged !== 'function') {
@@ -376,24 +270,19 @@
 
                 cfg.onBuildChanged(function (build) {
                     clearTimeout(loadingTimer);
-                    log('onBuildChanged: status=' + build.status +
-                        ' (type=' + typeof build.status + ')' +
-                        ', result=' + build.result +
-                        ' (type=' + typeof build.result + ')' +
-                        ', id=' + build.id);
 
                     if (!build) { showScreen('allgood'); return; }
 
-                    /* Build still running? */
+                    log('build: id=' + build.id +
+                        ', status=' + build.status + '(' + typeof build.status + ')' +
+                        ', result=' + build.result + '(' + typeof build.result + ')');
+
                     if (!isBuildCompleted(build)) {
-                        log('Build not completed yet');
                         showScreen('running');
                         return;
                     }
 
-                    /* Build succeeded → task never ran (decorator condition: failed()) */
                     if (isBuildSucceeded(build)) {
-                        log('Build succeeded, no analysis expected');
                         showScreen('allgood');
                         return;
                     }
@@ -402,46 +291,105 @@
                     fetchAnalysis(build.id);
                 });
             } catch (e) {
-                log('ERROR in VSS.ready: ' + e.message);
                 clearTimeout(loadingTimer);
-                showScreen('allgood');
+                showError('VSS.ready error: ' + e.message);
             }
         });
 
         function fetchAnalysis(buildId) {
             var projectId = VSS.getWebContext().project.id;
-            log('fetchAnalysis: project=' + projectId + ', build=' + buildId);
+            var collectionUri = VSS.getWebContext().collection.uri;
+            if (!collectionUri.endsWith('/')) collectionUri += '/';
 
-            /* Strategy: try REST first (simpler, no timeline dependency),
-               fall back to SDK getAttachment if REST fails */
-            fetchAttachmentREST(projectId, buildId)
-                .then(showAnalysisContent)
-                .catch(function (restErr) {
-                    log('REST failed: ' + restErr.message + ' — trying SDK...');
+            log('project=' + projectId + ', build=' + buildId);
+            log('collectionUri=' + collectionUri);
 
-                    VSS.require(['TFS/Build/RestClient'], function (BuildRestClient) {
-                        var client = BuildRestClient.getClient();
-                        fetchAttachmentSDK(client, projectId, buildId)
-                            .then(showAnalysisContent)
-                            .catch(function (sdkErr) {
-                                log('SDK also failed: ' + sdkErr.message);
-                                log('Both methods failed — showing allgood');
-                                showScreen('allgood');
-                            });
+            /* Step 1: Get auth token */
+            VSS.getAccessToken().then(function (token) {
+                log('Got access token (length=' + (token.token ? token.token.length : 'N/A') + ')');
+
+                /* Build the auth header manually — simpler than requiring AuthServices */
+                var authHeader = 'Bearer ' + token.token;
+
+                /* Step 2: Get the timeline to find our task record */
+                var timelineUrl = collectionUri + projectId +
+                    '/_apis/build/builds/' + buildId +
+                    '/timeline?api-version=7.1-preview.2';
+                log('Fetching timeline: ' + timelineUrl);
+
+                fetch(timelineUrl, {
+                    headers: { 'Authorization': authHeader }
+                })
+                .then(function (r) {
+                    log('Timeline response: ' + r.status);
+                    if (!r.ok) throw new Error('Timeline HTTP ' + r.status);
+                    return r.json();
+                })
+                .then(function (timeline) {
+                    if (!timeline || !timeline.records) {
+                        throw new Error('Empty timeline');
+                    }
+                    log('Timeline records: ' + timeline.records.length +
+                        ', timelineId: ' + timeline.id);
+
+                    /* Find our task's record */
+                    var rec = null;
+                    for (var i = 0; i < timeline.records.length; i++) {
+                        var r = timeline.records[i];
+                        if (r.task && r.task.id &&
+                            r.task.id.toLowerCase() === TASK_GUID) {
+                            log('Found task: state=' + r.state +
+                                '(' + typeof r.state + '), id=' + r.id);
+                            rec = r;
+                            break;  /* take first match regardless of state */
+                        }
+                    }
+
+                    if (!rec) {
+                        showError('CopilotFailureAnalysis task not found in timeline. ' +
+                            'Records scanned: ' + timeline.records.length);
+                        return;
+                    }
+
+                    /* Step 3: Download the attachment using timeline-based URL */
+                    var attachUrl = collectionUri + projectId +
+                        '/_apis/build/builds/' + buildId +
+                        '/timeline/' + timeline.id +
+                        '/records/' + rec.id +
+                        '/attachments/' + ATTACHMENT_TYPE +
+                        '/' + ATTACHMENT_NAME +
+                        '?api-version=7.1-preview.2';
+                    log('Fetching attachment: ' + attachUrl);
+
+                    return fetch(attachUrl, {
+                        headers: { 'Authorization': authHeader }
                     });
+                })
+                .then(function (r) {
+                    if (!r) return;  /* early return from showError branch */
+                    log('Attachment response: ' + r.status +
+                        ', content-type: ' + r.headers.get('content-type'));
+                    if (!r.ok) throw new Error('Attachment HTTP ' + r.status);
+                    return r.text();
+                })
+                .then(function (md) {
+                    if (!md) return;
+                    if (md.trim().length > 0) {
+                        log('Got analysis: ' + md.length + ' chars');
+                        document.getElementById('analysis-content')
+                            .innerHTML = renderMarkdown(md);
+                        showScreen('analysis');
+                    } else {
+                        showError('Attachment was empty');
+                    }
+                })
+                .catch(function (err) {
+                    showError('Failed to fetch analysis: ' + err.message);
                 });
-        }
 
-        function showAnalysisContent(md) {
-            if (md && md.trim().length > 0) {
-                log('Got analysis content: ' + md.length + ' chars');
-                document.getElementById('analysis-content')
-                    .innerHTML = renderMarkdown(md);
-                showScreen('analysis');
-            } else {
-                log('Empty analysis content');
-                showScreen('allgood');
-            }
+            }).catch(function (tokenErr) {
+                showError('Cannot get access token: ' + tokenErr.message);
+            });
         }
     </script>
 </body>
