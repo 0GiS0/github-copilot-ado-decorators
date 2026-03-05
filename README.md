@@ -111,6 +111,8 @@ For full deployment steps, see [DEPLOYMENT.md](DEPLOYMENT.md).
 
 > ⚠️ **Important:** The service connection name must be exactly `GitHub Copilot CLI Decorator`.
 
+> 💡 **Pro Tip:** Instead of creating a service connection in each project, you can create it once at the **Organization level** and share it across all projects. Go to **Organization Settings** → **Service connections** → create the connection there → then use **Security** to grant access to all projects. This way you only need to manage it in one place!
+
 ## ⚙️ Configuration
 
 ### Opt-Out (Optional)
@@ -274,6 +276,8 @@ Para pasos completos de despliegue, ver [DEPLOYMENT.md](DEPLOYMENT.md).
 5. Clic en **Save**
 
 > ⚠️ **Importante:** El nombre de la conexión de servicio debe ser exactamente `GitHub Copilot CLI Decorator`.
+
+> 💡 **Pro Tip:** En lugar de crear una conexión de servicio en cada proyecto, puedes crearla una vez a nivel de **Organización** y compartirla con todos los proyectos. Ve a **Organization Settings** → **Service connections** → crea la conexión allí → luego usa **Security** para dar acceso a todos los proyectos. ¡Así solo tienes que gestionarla en un único lugar!
 
 ## ⚙️ Configuración
 
