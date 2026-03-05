@@ -220,6 +220,9 @@
             if (!el) return;
             el.classList.add('active');
             if (id === 'analysis') el.style.display = 'block';
+
+            /* Tell ADO iframe to resize to fit content */
+            setTimeout(function () { VSS.resize(); }, 50);
         }
 
         function showError(msg) {
