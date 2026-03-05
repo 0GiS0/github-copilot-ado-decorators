@@ -22,16 +22,26 @@
 ---
 
 ## 📑 Tabla de Contenidos
-- [Características](#-características)
-- [Cómo Funciona](#-cómo-funciona)
-- [Requisitos Previos](#-requisitos-previos)
-- [Instalación](#-instalación)
-- [Configuración](#-configuración)
-- [Qué Verás](#-qué-verás)
-- [Arquitectura](#-arquitectura)
-- [Solución de Problemas](#-solución-de-problemas)
-- [Contribuir](#-contribuir)
-- [Sígueme](#-sígueme-en-mis-redes-sociales)
+- [🤖 GitHub Copilot Pipeline Failure Analyzer](#-github-copilot-pipeline-failure-analyzer)
+  - [📑 Tabla de Contenidos](#-tabla-de-contenidos)
+  - [✨ Características](#-características)
+  - [🛠️ Cómo Funciona](#️-cómo-funciona)
+  - [📋 Requisitos Previos](#-requisitos-previos)
+  - [🚀 Instalación](#-instalación)
+    - [Paso 1: Instalar la Extensión](#paso-1-instalar-la-extensión)
+    - [Paso 2: Crear la Conexión de Servicio](#paso-2-crear-la-conexión-de-servicio)
+  - [⚙️ Configuración](#️-configuración)
+    - [Opt-Out (Opcional)](#opt-out-opcional)
+    - [Inputs de la Tarea](#inputs-de-la-tarea)
+  - [👀 Qué Verás](#-qué-verás)
+    - [🤖 Pestaña Copilot Failure Analysis](#-pestaña-copilot-failure-analysis)
+    - [Pestaña Extensions](#pestaña-extensions)
+  - [🏗️ Arquitectura](#️-arquitectura)
+  - [🔧 Solución de Problemas](#-solución-de-problemas)
+  - [🤝 Contribuir](#-contribuir)
+    - [Setup de Desarrollo](#setup-de-desarrollo)
+  - [📄 Licencia](#-licencia)
+  - [🌐 Sígueme en Mis Redes Sociales](#-sígueme-en-mis-redes-sociales)
 
 ## ✨ Características
 
