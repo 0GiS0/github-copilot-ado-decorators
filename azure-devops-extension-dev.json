@@ -4,7 +4,7 @@
     "publisher": "returngisorg",
 
 
-    "version": "0.22.5",
+    "version": "0.22.6",
     "name": "GitHub Copilot Pipeline Failure Analyzer [DEV]",
     "description": "Automatically analyzes pipeline failures using AI and provides root cause analysis with fix suggestions. (Development version)",
     "categories": ["Azure Pipelines"],
