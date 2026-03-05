@@ -196,7 +196,6 @@
 
     <script>
         /* ---- constants ---- */
-        var TASK_GUID        = "1eb0639b-4621-4a25-a38d-f66f162787b6";
         var ATTACHMENT_TYPE  = "copilot-analysis";
         var ATTACHMENT_NAME  = "report";
         var LOADING_TIMEOUT  = 25000;
@@ -308,68 +307,65 @@
             VSS.getAccessToken().then(function (token) {
                 log('Got access token (length=' + (token.token ? token.token.length : 'N/A') + ')');
 
-                /* Build the auth header manually — simpler than requiring AuthServices */
                 var authHeader = 'Bearer ' + token.token;
 
-                /* Step 2: Get the timeline to find our task record */
-                var timelineUrl = collectionUri + projectId +
+                /* Step 2: List build-level attachments of our type */
+                var listUrl = collectionUri + projectId +
                     '/_apis/build/builds/' + buildId +
-                    '/timeline?api-version=7.1-preview.2';
-                log('Fetching timeline: ' + timelineUrl);
+                    '/attachments/' + ATTACHMENT_TYPE +
+                    '?api-version=7.1-preview.2';
+                log('Fetching attachments list: ' + listUrl);
 
-                fetch(timelineUrl, {
+                fetch(listUrl, {
                     headers: { 'Authorization': authHeader }
                 })
                 .then(function (r) {
-                    log('Timeline response: ' + r.status);
-                    if (!r.ok) throw new Error('Timeline HTTP ' + r.status);
+                    log('Attachments list response: ' + r.status);
+                    if (!r.ok) throw new Error('Attachments list HTTP ' + r.status);
                     return r.json();
                 })
-                .then(function (timeline) {
-                    if (!timeline || !timeline.records) {
-                        throw new Error('Empty timeline');
+                .then(function (data) {
+                    if (!data || !data.value || data.value.length === 0) {
+                        throw new Error('No attachments of type "' + ATTACHMENT_TYPE +
+                            '" found. The CopilotFailureAnalysis task may not have run.');
                     }
-                    log('Timeline records: ' + timeline.records.length +
-                        ', timelineId: ' + timeline.id);
 
-                    /* Find our task's record */
-                    var rec = null;
-                    for (var i = 0; i < timeline.records.length; i++) {
-                        var r = timeline.records[i];
-                        if (r.task && r.task.id &&
-                            r.task.id.toLowerCase() === TASK_GUID) {
-                            log('Found task: state=' + r.state +
-                                '(' + typeof r.state + '), id=' + r.id);
-                            rec = r;
-                            break;  /* take first match regardless of state */
+                    log('Found ' + data.value.length + ' attachment(s)');
+
+                    /* Find the attachment named "report" */
+                    var attachment = null;
+                    for (var i = 0; i < data.value.length; i++) {
+                        log('Attachment[' + i + ']: name=' + data.value[i].name);
+                        if (data.value[i].name === ATTACHMENT_NAME) {
+                            attachment = data.value[i];
+                            break;
                         }
                     }
 
-                    if (!rec) {
-                        showError('CopilotFailureAnalysis task not found in timeline. ' +
-                            'Records scanned: ' + timeline.records.length);
-                        return;
+                    if (!attachment) {
+                        throw new Error('Attachment "' + ATTACHMENT_NAME +
+                            '" not found among ' + data.value.length + ' attachment(s)');
                     }
 
-                    /* Step 3: Download the attachment using timeline-based URL */
-                    var attachUrl = collectionUri + projectId +
-                        '/_apis/build/builds/' + buildId +
-                        '/timeline/' + timeline.id +
-                        '/records/' + rec.id +
-                        '/attachments/' + ATTACHMENT_TYPE +
-                        '/' + ATTACHMENT_NAME +
-                        '?api-version=7.1-preview.2';
-                    log('Fetching attachment: ' + attachUrl);
+                    /* Step 3: Download the attachment content */
+                    var downloadUrl = (attachment._links && attachment._links.self &&
+                        attachment._links.self.href) || attachment.url;
 
-                    return fetch(attachUrl, {
+                    if (!downloadUrl) {
+                        throw new Error('No download URL in attachment metadata');
+                    }
+
+                    log('Downloading attachment: ' + downloadUrl);
+
+                    return fetch(downloadUrl, {
                         headers: { 'Authorization': authHeader }
                     });
                 })
                 .then(function (r) {
-                    if (!r) return;  /* early return from showError branch */
-                    log('Attachment response: ' + r.status +
+                    if (!r) return;
+                    log('Attachment download response: ' + r.status +
                         ', content-type: ' + r.headers.get('content-type'));
-                    if (!r.ok) throw new Error('Attachment HTTP ' + r.status);
+                    if (!r.ok) throw new Error('Attachment download HTTP ' + r.status);
                     return r.text();
                 })
                 .then(function (md) {
