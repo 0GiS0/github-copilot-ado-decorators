@@ -207,6 +207,22 @@
             console.log('[CopilotTab] ' + msg);
         }
 
+        /* ---- iframe auto-resize ---- */
+        function notifyResize() {
+            try {
+                var h = document.documentElement.scrollHeight
+                     || document.body.scrollHeight;
+                log('notifyResize h=' + h);
+                VSS.resize(undefined, h);
+            } catch (_) {}
+        }
+
+        /* ResizeObserver: automatically resize whenever content changes */
+        if (typeof ResizeObserver !== 'undefined') {
+            new ResizeObserver(function () { notifyResize(); })
+                .observe(document.body);
+        }
+
         /* ---- helpers ---- */
         function showScreen(id) {
             log('showScreen → ' + id);
@@ -220,11 +236,10 @@
             el.classList.add('active');
             if (id === 'analysis') el.style.display = 'block';
 
-            /* Tell ADO iframe to resize to fit full content height */
-            setTimeout(function () {
-                var height = document.body.scrollHeight;
-                VSS.resize(undefined, height);
-            }, 100);
+            /* Resize after DOM settles — multiple attempts for safety */
+            setTimeout(notifyResize, 0);
+            setTimeout(notifyResize, 200);
+            setTimeout(notifyResize, 1000);
         }
 
         function showError(msg) {
