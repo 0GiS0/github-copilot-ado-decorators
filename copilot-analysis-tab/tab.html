@@ -21,6 +21,11 @@
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
+        html, body {
+            height: auto;
+            overflow: visible;
+        }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
             background: var(--cp-bg);
@@ -33,7 +38,7 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            min-height: 55vh;
+            min-height: 400px;
             padding: 48px 24px;
             animation: fadeIn 0.35s ease;
         }
@@ -208,19 +213,35 @@
         }
 
         /* ---- iframe auto-resize ---- */
+        var _lastHeight = 0;
         function notifyResize() {
             try {
-                var h = document.documentElement.scrollHeight
-                     || document.body.scrollHeight;
-                log('notifyResize h=' + h);
-                VSS.resize(undefined, h);
+                /* Measure from every possible source */
+                var body = document.body;
+                var html = document.documentElement;
+                var h = Math.max(
+                    body.scrollHeight, body.offsetHeight, body.clientHeight,
+                    html.scrollHeight, html.offsetHeight, html.clientHeight
+                );
+                /* Only call resize when height actually changed (avoid loops) */
+                if (h !== _lastHeight && h > 0) {
+                    _lastHeight = h;
+                    log('notifyResize h=' + h);
+                    VSS.resize(undefined, h);
+                }
             } catch (_) {}
         }
 
-        /* ResizeObserver: automatically resize whenever content changes */
+        /* ResizeObserver + MutationObserver: resize whenever content changes */
         if (typeof ResizeObserver !== 'undefined') {
-            new ResizeObserver(function () { notifyResize(); })
-                .observe(document.body);
+            new ResizeObserver(function () {
+                setTimeout(notifyResize, 0);
+            }).observe(document.documentElement);
+        }
+        if (typeof MutationObserver !== 'undefined') {
+            new MutationObserver(function () {
+                setTimeout(notifyResize, 50);
+            }).observe(document.body, { childList: true, subtree: true });
         }
 
         /* ---- helpers ---- */
@@ -272,10 +293,15 @@
             showError('Timeout reached (' + LOADING_TIMEOUT + 'ms). The analysis could not be loaded.');
         }, LOADING_TIMEOUT);
 
-        VSS.init({ usePlatformScripts: true, usePlatformStyles: true });
+        VSS.init({
+            usePlatformScripts: true,
+            usePlatformStyles: true,
+            explicitNotifyLoaded: true
+        });
 
         VSS.ready(function () {
             log('VSS.ready fired');
+            VSS.notifyLoadSucceeded();
             try {
                 var cfg = VSS.getConfiguration();
                 log('cfg: ' + (cfg ? 'OK' : 'null') +
