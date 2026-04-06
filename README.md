@@ -11,9 +11,11 @@
 
 ---
 
-Hey developer 👋🏻! This is an Azure DevOps extension that automatically analyzes pipeline failures using [GitHub Copilot CLI](https://www.npmjs.com/package/@github/copilot) and provides AI-powered root cause analysis with actionable fix suggestions — directly in your Pipeline Run Summary.
+Hey developer 👋🏻! **GitHub Copilot Pipeline Failure Analyzer** is an Azure DevOps pipeline decorator that uses [GitHub Copilot CLI](https://www.npmjs.com/package/@github/copilot) to inspect failed pipeline runs, identify likely root causes, and publish actionable fix suggestions directly in the Pipeline Run Summary.
 
-<img src="failure.png" alt="Copilot Failure Analysis Screenshot" width="100%" />
+<div align="center">
+  <img src="failure.png" alt="Copilot Failure Analysis Screenshot" width="900" />
+</div>
 
 ---
 
