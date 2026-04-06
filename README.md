@@ -14,7 +14,7 @@
 Hey developer 👋🏻! **GitHub Copilot Pipeline Failure Analyzer** is an Azure DevOps pipeline decorator that uses [GitHub Copilot CLI](https://www.npmjs.com/package/@github/copilot) to inspect failed pipeline runs, identify likely root causes, and publish actionable fix suggestions directly in the Pipeline Run Summary.
 
 <div align="center">
-  <img src="failure.png" alt="Copilot Failure Analysis Screenshot" width="900" />
+  <img src="failure.png" alt="Copilot Failure Analysis Screenshot" width="30%" />
 </div>
 
 ---
