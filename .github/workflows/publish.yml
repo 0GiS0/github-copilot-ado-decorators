@@ -56,5 +56,14 @@ jobs:
       - name: 🏗️ Build extension
         run: npm run build
 
+      - name: 🔢 Determine version to publish
+        id: version
+        env:
+          ADO_PAT: ${{ secrets.ADO_PAT }}
+        run: |
+          NEXT=$(node scripts/compute-next-version.js azure-devops-extension-dev.json "$ADO_PAT")
+          echo "Versión a publicar: $NEXT"
+          echo "next=$NEXT" >> "$GITHUB_OUTPUT"
+
       - name: 🎉 Publish extension to Azure DevOps Marketplace (Dev)
-        run: npm run publish-extension:dev -- --token ${{ secrets.ADO_PAT }}
+        run: npm run publish-extension:dev -- --override "{\"version\":\"${{ steps.version.outputs.next }}\"}" --token ${{ secrets.ADO_PAT }}
