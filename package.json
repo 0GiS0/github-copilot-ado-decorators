@@ -7,7 +7,7 @@
   "private": true,
   "scripts": {
     "compile": "tsc",
-    "postcompile": "cp src/copilot-failure-analysis-task/task.json dist/copilot-failure-analysis-task/ && node -e \"require('fs').writeFileSync('dist/copilot-failure-analysis-task/package.json', JSON.stringify({dependencies:{'azure-pipelines-task-lib':'^4.0.0'}}))\" && npm install --production --prefix dist/copilot-failure-analysis-task && mkdir -p copilot-analysis-tab/lib && cp node_modules/vss-web-extension-sdk/lib/VSS.SDK.min.js copilot-analysis-tab/lib/",
+    "postcompile": "cp src/copilot-failure-analysis-task/task.json dist/copilot-failure-analysis-task/ && node -e \"require('fs').writeFileSync('dist/copilot-failure-analysis-task/package.json', JSON.stringify({dependencies:{'azure-pipelines-task-lib':'^5.2.7'}}))\" && npm install --production --prefix dist/copilot-failure-analysis-task && mkdir -p copilot-analysis-tab/lib && cp node_modules/vss-web-extension-sdk/lib/VSS.SDK.min.js copilot-analysis-tab/lib/",
     "build": "npm run compile",
     "build:dev": "npm run compile && npm run package-extension:dev",
     "package-extension": "tfx extension create --manifest-globs azure-devops-extension.json",
@@ -18,7 +18,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "azure-pipelines-task-lib": "^4.17.3"
+    "azure-pipelines-task-lib": "^5.2.7"
   },
   "devDependencies": {
     "@types/jest": "^29.0.0",
